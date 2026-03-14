@@ -9,7 +9,7 @@ node_modules/
 .env
 .env.*
 !.env.example
-ecosystem.config.example.js
+ecosystem.config.js
 
 # ==============================
 # Logs
