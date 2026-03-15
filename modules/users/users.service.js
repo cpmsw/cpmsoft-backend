@@ -1,5 +1,6 @@
 const db = require('../../db/authDb');
 const crud = require('../../services/baseCrudService');
+const bcrypt = require("bcrypt");
 
 const TABLE = "users";
 
@@ -71,12 +72,23 @@ async function getById(tenantId, id) {
 // -----------------------------
 async function create(tenantId, userId, data) {
 
+  if (!data) {
+    throw new Error("Request body missing");
+  }
+  if (!data.password) {
+    throw new Error("Password is required");
+  }
+  if (!data.firstname || !data.lastname || !data.email) {
+    throw new Error("Missing required fields");
+  }
+  const passwordhash = await bcrypt.hash(data.password, 10);
   const payload = {
     firstname: data.firstname,
     lastname: data.lastname,
     email: data.email,
-    role: data.role,
-    is_active: data.is_active
+    passwordhash,
+    role: data.role ?? "user",
+    is_active: data.is_active ?? true
   };
 
   const row = await crud.create(
@@ -89,7 +101,6 @@ async function create(tenantId, userId, data) {
 
   return mapRow(row);
 }
-
 // -----------------------------
 async function update(tenantId, userId, id, data) {
 

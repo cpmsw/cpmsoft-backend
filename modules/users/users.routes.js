@@ -32,13 +32,33 @@ module.exports = async function (fastify) {
 
   // CREATE USER
   fastify.post('/', {
-    preHandler: verifyToken
+    preHandler: verifyToken,
+    schema: {
+      body: {
+        type: "object",
+        required: ["firstname", "lastname", "email", "password"],
+        properties: {
+          firstname: { type: "string" },
+          lastname: { type: "string" },
+          email: { type: "string" },
+          password: { type: "string" },
+          role: { type: "string" },
+          is_active: { type: "boolean" }
+        }
+      }
+    }
   }, async (request) => {
+
     const tenantId = request.user.tenantId;
     const userId = request.user.userId;
-    return service.create(tenantId, userId, request.body);
-  });
 
+    return service.create(
+      tenantId,
+      userId,
+      request.body
+    );
+
+  });
   // UPDATE USER
   fastify.put('/:id', {
     preHandler: verifyToken
