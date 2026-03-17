@@ -79,4 +79,7 @@ module.exports = async function (fastify) {
     return service.softDelete(tenantId, userId, id);
   });
 
+
+
+
 };

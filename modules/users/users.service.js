@@ -1,6 +1,7 @@
 const db = require('../../db/authDb');
 const crud = require('../../services/baseCrudService');
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 
 const TABLE = "users";
 
@@ -125,22 +126,121 @@ async function update(tenantId, userId, id, data) {
 }
 
 // -----------------------------
-async function softDelete(tenantId, userId, id) {
+async function softDelete(tenantId, adminId, userId) {
 
-  return crud.softDelete(
-    db,
-    TABLE,
-    tenantId,
-    userId,
-    id
+  // Protect tenant owner
+  const tenant = await db.query(
+    `SELECT owner_user_id
+     FROM tenants
+     WHERE id = $1`,
+    [tenantId]
   );
+
+  if (tenant.rows[0]?.owner_user_id === userId) {
+    throw new Error("Tenant owner cannot be deactivated");
+  }
+
+  // Deactivate user instead of deleting
+  await db.query(
+    `UPDATE users
+     SET is_active = false,
+         deactivated_at = now(),
+         deactivated_by = $2
+     WHERE id = $3
+     AND tenant_id = $1`,
+    [tenantId, adminId, userId]
+  );
+
+  return { success: true };
 }
 
+
+async function inviteUser(tenantId, adminId, data) {
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+  const expires = new Date(Date.now() + 15 * 60 * 1000);
+
+  const email = data.email.toLowerCase().trim();
+
+  await db.query(
+    `INSERT INTO users
+     (tenant_id,email,firstname,lastname,role,
+      passwordhash,is_verified,
+      verification_code,verification_expires,
+      created_by)
+     VALUES ($1,$2,$3,$4,$5,
+             NULL,false,
+             $6,$7,$8)`,
+    [
+      tenantId,
+      email,
+      data.firstname,
+      data.lastname,
+      data.role || 'user',
+      code,
+      expires,
+      adminId
+    ]
+  );
+
+  // TODO: send email later
+  console.log("INVITE CODE:", code);
+
+  return { success: true };
+}
+
+
+async function activateUser(email, code, password) {
+
+  const emailNormalized = email.toLowerCase().trim();
+
+  console.log("ACTIVATE EMAIL:", emailNormalized);
+  console.log("ACTIVATE CODE RECEIVED:", code);
+
+  const result = await db.query(
+    `SELECT id, verification_code, verification_expires
+     FROM users
+     WHERE email = $1`,
+    [email.toLowerCase()]
+  );
+
+  if (!result.rowCount) {
+    throw new Error("User not found");
+  }
+
+  const user = result.rows[0];
+
+  if (user.verification_code !== code) {
+    throw new Error("Invalid verification code");
+  }
+
+  if (new Date(user.verification_expires) < new Date()) {
+    throw new Error("Verification code expired");
+  }
+
+  const passwordhash = await bcrypt.hash(password, 10);
+
+  await db.query(
+    `UPDATE users
+     SET passwordhash = $1,
+         is_verified = true,
+         verified_at = now(),
+         verification_code = NULL,
+         verification_expires = NULL
+     WHERE id = $2`,
+    [passwordhash, user.id]
+  );
+
+  return { success: true };
+}
 module.exports = {
   countUsers,
   getUsers,
   getById,
   create,
   update,
-  softDelete
+  softDelete,
+  inviteUser,
+  activateUser
 };

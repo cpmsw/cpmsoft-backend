@@ -4,6 +4,7 @@ const verifyToken = require('./verifyToken');
 // Public API routes (no auth)
 const PUBLIC_ROUTES = [
   { method: 'POST', path: '/api/auth/login' },
+  { method: 'POST', path: '/api/auth/activate' },
   { method: 'POST', path: '/api/auth/2fa/setup-first' },
   { method: 'POST', path: '/api/auth/2fa/login-verify' },  // 🔥 add this
   { method: 'GET', path: '/api/auth/_test' },             // 🔥 add this

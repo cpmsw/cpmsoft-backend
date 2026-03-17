@@ -92,7 +92,7 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 fastify.addHook('onRoute', (routeOptions) => {
   if (routeOptions.url.startsWith('/api/') &&
-      !['/api/auth/login', '/api/ping', '/api/health'].includes(routeOptions.url)) {
+      !['/api/auth/login', '/api/auth/activate','/api/ping', '/api/health'].includes(routeOptions.url)) {
     routeOptions.schema = routeOptions.schema || {};
     routeOptions.schema.security = [{ bearerAuth: [] }];
   }

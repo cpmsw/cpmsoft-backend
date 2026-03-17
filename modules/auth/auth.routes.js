@@ -5,6 +5,7 @@ const verifyToken = require('../../middleware/verifyToken');
 const speakeasy = require("speakeasy");
 const QRCode = require("qrcode");
 const { sendEmail } = require('../../services/emailService');
+const service = require('../users/users.service');
 
 module.exports = async function authRoutes(fastify) {
 
@@ -127,12 +128,13 @@ module.exports = async function authRoutes(fastify) {
     const result = await db.query(
       `SELECT id,email,firstname,lastname,tenant_id,role,
               passwordhash,twofa_required,twofa_enabled,
-              twofa_secret,theme_mode,accent_theme,is_active
+              twofa_secret,theme_mode,accent_theme,is_active,
+       is_verified
        FROM users
        WHERE email = $1
          AND is_deleted = false
-         AND COALESCE(is_active, true) = true
-         AND isunsubscribed = false`,
+        AND is_active = true
+         AND isunsubscribed = false LIMIT 1` ,
       [email]
     );
 
@@ -151,6 +153,9 @@ module.exports = async function authRoutes(fastify) {
     if (!match) {
       return reply.code(401).send({ error: 'Invalid login' });
     }
+    if (!user.is_verified) {
+      return reply.code(403).send({ error: "Account not activated. Please activate your account first." });
+    }
 
     // 🔐 2FA Enforcement
     if (user.twofa_required) {
@@ -168,6 +173,13 @@ module.exports = async function authRoutes(fastify) {
         userId: user.id
       };
     }
+
+    await db.query(
+      `UPDATE users
+   SET last_login_at = now()
+   WHERE id = $1`,
+      [user.id]
+    );
 
     // Normal login
     const token = jwt.sign(
@@ -577,5 +589,62 @@ module.exports = async function authRoutes(fastify) {
     };
   });
 
+  // -----------------------------
+  // INVITE USER
+  // -----------------------------
+  fastify.post('/invite-user', {
+    preHandler: verifyToken,
+    schema: {
+      body: {
+        type: 'object',
+        required: ['email', 'firstname', 'lastname'],
+        properties: {
+          email: {
+            type: 'string',
+            format: 'email'
+          },
+          firstname: {
+            type: 'string'
+          },
+          lastname: {
+            type: 'string'
+          },
+          role: {
+            type: 'string',
+            enum: ['admin', 'manager', 'user', 'viewer']
+          }
+        }
+      }
+    }
+  }, async (request, reply) => {
+
+    const tenantId = request.user.tenantId;
+    const adminId = request.user.userId;
+
+    const { email, firstname, lastname, role } = request.body;
+
+    return service.inviteUser(
+      tenantId,
+      adminId,
+      {
+        email,
+        firstname,
+        lastname,
+        role
+      }
+    );
+
+  });
+  // -----------------------------
+  // ACTIVATE USER
+  // -----------------------------
+
+  fastify.post('/activate', async (request, reply) => {
+
+    const { email, code, password } = request.body;
+
+    return service.activateUser(email, code, password);
+
+  });
 
 };
