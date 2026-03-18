@@ -23,7 +23,7 @@ module.exports = async function authRoutes(fastify) {
 
     await db.query(
       `UPDATE users
-     SET passwordhash = $1,
+     SET password_hash = $1,
          reset_code = NULL,
          reset_code_expires = NULL
      WHERE id = $2`,
@@ -62,7 +62,7 @@ module.exports = async function authRoutes(fastify) {
 
     const result = await db.query(
       `SELECT id,email,firstname,lastname,tenant_id,role,
-            passwordhash,is_active
+            password_hash,is_active
      FROM users
      WHERE email = $1
        AND is_deleted = false
@@ -77,7 +77,7 @@ module.exports = async function authRoutes(fastify) {
 
     const user = result.rows[0];
 
-    const match = await bcrypt.compare(password, user.passwordhash);
+    const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
       return reply.code(401).send({ error: 'Invalid login' });
     }
@@ -127,7 +127,7 @@ module.exports = async function authRoutes(fastify) {
 
     const result = await db.query(
       `SELECT id,email,firstname,lastname,tenant_id,role,
-              passwordhash,twofa_required,twofa_enabled,
+              password_hash,twofa_required,twofa_enabled,
               twofa_secret,theme_mode,accent_theme,is_active,
        is_verified
        FROM users
@@ -149,7 +149,7 @@ module.exports = async function authRoutes(fastify) {
       return reply.code(403).send({ error: "Account disabled. Contact administrator." });
     }
 
-    const match = await bcrypt.compare(password, user.passwordhash);
+    const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
       return reply.code(401).send({ error: 'Invalid login' });
     }

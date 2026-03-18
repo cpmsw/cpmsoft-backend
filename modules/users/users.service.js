@@ -82,12 +82,12 @@ async function create(tenantId, userId, data) {
   if (!data.firstname || !data.lastname || !data.email) {
     throw new Error("Missing required fields");
   }
-  const passwordhash = await bcrypt.hash(data.password, 10);
+  const password_hash = await bcrypt.hash(data.password, 10);
   const payload = {
     firstname: data.firstname,
     lastname: data.lastname,
     email: data.email,
-    passwordhash,
+    password_hash,
     role: data.role ?? "user",
     is_active: data.is_active ?? true
   };
@@ -166,7 +166,7 @@ async function inviteUser(tenantId, adminId, data) {
   await db.query(
     `INSERT INTO users
      (tenant_id,email,firstname,lastname,role,
-      passwordhash,is_verified,
+      password_hash,is_verified,
       verification_code,verification_expires,
       created_by)
      VALUES ($1,$2,$3,$4,$5,
@@ -219,17 +219,17 @@ async function activateUser(email, code, password) {
     throw new Error("Verification code expired");
   }
 
-  const passwordhash = await bcrypt.hash(password, 10);
+  const password_hash = await bcrypt.hash(password, 10);
 
   await db.query(
     `UPDATE users
-     SET passwordhash = $1,
+     SET password_hash = $1,
          is_verified = true,
          verified_at = now(),
          verification_code = NULL,
          verification_expires = NULL
      WHERE id = $2`,
-    [passwordhash, user.id]
+    [password_hash, user.id]
   );
 
   return { success: true };
