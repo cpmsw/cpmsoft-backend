@@ -67,7 +67,7 @@ module.exports = async function authRoutes(fastify) {
      WHERE email = $1
        AND is_deleted = false
        AND COALESCE(is_active, true) = true
-       AND isunsubscribed = false`,
+       AND is_unsubscribed = false`,
       [email]
     );
 
@@ -134,7 +134,7 @@ module.exports = async function authRoutes(fastify) {
        WHERE email = $1
          AND is_deleted = false
         AND is_active = true
-         AND isunsubscribed = false LIMIT 1` ,
+         AND is_unsubscribed = false LIMIT 1` ,
       [email]
     );
 
