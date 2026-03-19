@@ -21,7 +21,7 @@ async function getAll(tenantId, search) {
       `SELECT *
        FROM customers
        WHERE tenant_id = $1
-         AND is_deleted = false
+         AND is_active = true
        ORDER BY created_at DESC
        LIMIT 100`,
       [tenantId]
@@ -35,7 +35,7 @@ async function getAll(tenantId, search) {
     `SELECT *
      FROM customers
      WHERE tenant_id = $1
-       AND is_deleted = false
+       AND is_active = true
        AND (
          customer_code ILIKE $2 OR
          name ILIKE $2 OR
@@ -58,7 +58,7 @@ async function getById(tenantId, id) {
      FROM customers
      WHERE id = $1
        AND tenant_id = $2
-       AND is_deleted = false`,
+       AND is_active = true`,
     [id, tenantId]
   );
   
@@ -113,7 +113,7 @@ async function update(tenantId, userId, id, data) {
          updated_by = $5
      WHERE id = $6
        AND tenant_id = $7
-       AND is_deleted = false
+       AND is_active = true
      RETURNING *`,
     [customerCode, name, email, phone, userId, id, tenantId]
   );
@@ -131,12 +131,12 @@ async function update(tenantId, userId, id, data) {
 async function softDelete(tenantId, userId, id) {
   const result = await db.query(
     `UPDATE customers
-     SET is_deleted = true,
-         deleted_at = now(),
-         deleted_by = $1
+     SET is_active = false,
+         deactivated_at = now(),
+         deactivated_by = $1
      WHERE id = $2
        AND tenant_id = $3
-       AND is_deleted = false`,
+       AND is_active = true`,
     [userId, id, tenantId]
   );
 

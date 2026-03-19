@@ -27,7 +27,7 @@ async function countUsers(tenantId) {
     `SELECT COUNT(*)::int AS count
      FROM users
      WHERE tenant_id = $1
-     AND is_deleted = false`,
+     AND is_active = true`,
     [tenantId]
   );
 
@@ -43,7 +43,7 @@ async function getUsers(tenantId, search) {
     `SELECT *
      FROM users
      WHERE tenant_id = $1
-     AND is_deleted = false
+     AND is_active = true
      AND (
         first_name ILIKE $2 OR
         last_name ILIKE $2 OR

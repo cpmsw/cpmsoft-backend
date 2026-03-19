@@ -73,6 +73,7 @@ module.exports = async function (fastify) {
   fastify.delete('/:id', {
     preHandler: verifyToken
   }, async (request) => {
+    console.log("🔥 SOFT DELETE ROUTE HIT");
     const tenantId = request.user.tenantId;
     const userId = request.user.userId;
     const { id } = request.params;

@@ -53,7 +53,7 @@ module.exports = async function (fastify) {
       FROM budget_lines
       WHERE tenant_id = $1
         AND project_id = $2
-        AND is_deleted = false
+        AND is_active = true
       ORDER BY line_number
     `, [tenantId, projectId]);
 
@@ -222,7 +222,7 @@ module.exports = async function (fastify) {
       WHERE id = $8
         AND project_id = $9
         AND tenant_id = $10
-        AND is_deleted = false
+        AND is_active = true
       RETURNING *
     `, [
       partNumber,
@@ -274,9 +274,9 @@ module.exports = async function (fastify) {
 
     await appDb.query(`
       UPDATE budget_lines
-      SET is_deleted = true,
-          deleted_at = now(),
-          deleted_by = $1
+      SET is_active = false,
+          deactivated_at = now(),
+          deactivated_by = $1
       WHERE id = $2
         AND project_id = $3
         AND tenant_id = $4

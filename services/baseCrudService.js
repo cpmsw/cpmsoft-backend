@@ -6,7 +6,7 @@ async function getById(db, table, tenantId, id) {
      FROM ${table}
      WHERE id = $1
      AND tenant_id = $2
-     AND is_deleted = false`,
+     AND is_active = true`,
     [id, tenantId]
   );
 
@@ -20,7 +20,7 @@ async function getAll(db, table, tenantId) {
     `SELECT *
      FROM ${table}
      WHERE tenant_id = $1
-     AND is_deleted = false
+     AND is_active = true
      ORDER BY created_at DESC`,
     [tenantId]
   );
@@ -46,6 +46,19 @@ async function create(db, table, tenantId, userId, data) {
     else {
       cleaned[key] = value;
     }
+  }
+
+  // ✅ ADD THIS BLOCK (critical fix)
+  if (!('is_active' in cleaned)) {
+    cleaned.is_active = true;
+  }
+
+  if (!('deactivated_at' in cleaned)) {
+    cleaned.deactivated_at = null;
+  }
+
+  if (!('deactivated_by' in cleaned)) {
+    cleaned.deactivated_by = null;
   }
 
   const keys = Object.keys(cleaned);
@@ -116,9 +129,9 @@ async function softDelete(db, table, tenantId, userId, id) {
 
   await db.query(
     `UPDATE ${table}
-     SET is_deleted = true,
-         deleted_at = now(),
-         deleted_by = $2
+     SET is_active = false,
+         deactivated_at = now(),
+         deactivated_by = $2
      WHERE id = $3
      AND tenant_id = $1`,
     [tenantId, userId, id]

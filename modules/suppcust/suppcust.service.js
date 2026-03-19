@@ -35,7 +35,7 @@ async function countSuppcust(tenantId, column) {
      FROM suppcust
      WHERE tenant_id = $1
      AND ${column} = true
-     AND is_deleted = false`,
+     AND is_active = true`,
     [tenantId]
   );
 
@@ -54,7 +54,7 @@ async function searchByType(tenantId, search, column) {
      FROM suppcust
      WHERE tenant_id = $1
      AND ${column} = true
-     AND is_deleted = false
+     AND is_active = true
      AND (
         name ILIKE $2 OR
         email ILIKE $2 OR

@@ -15,7 +15,7 @@ async function getAll(tenantId) {
     JOIN customers c
       ON p.customer_id = c.id
     WHERE p.tenant_id = $1
-      AND p.is_deleted = false
+      AND p.is_active = true
     ORDER BY p.name
   `, [tenantId]);
 

@@ -52,7 +52,7 @@ module.exports = async function (fastify) {
       JOIN customers c
         ON p.customer_id = c.id
       WHERE p.tenant_id = $1
-        AND p.is_deleted = false
+        AND p.is_active = true
       ORDER BY p.created_at DESC
     `, [tenantId]);
 
@@ -211,7 +211,7 @@ module.exports = async function (fastify) {
         updated_by = $8
     WHERE id = $9
       AND tenant_id = $10
-      AND is_deleted = false
+      AND is_active = true
     RETURNING *
   `, [
       projectCode,
@@ -254,12 +254,12 @@ module.exports = async function (fastify) {
 
     const result = await appDb.query(`
     UPDATE projects
-    SET is_deleted = true,
-        deleted_at = now(),
-        deleted_by = $1
+    SET is_active = false,
+        deactivated_at = now(),
+        deactivated_by = $1
     WHERE id = $2
       AND tenant_id = $3
-      AND is_deleted = false
+      AND is_active = true
   `, [userId, id, tenantId]);
 
     if (result.rowCount === 0) {

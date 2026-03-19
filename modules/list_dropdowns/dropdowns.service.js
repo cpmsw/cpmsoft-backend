@@ -10,7 +10,6 @@ async function getList(tenantId, type) {
      FROM list_dropdowns
      WHERE tenant_id = $1
      AND dropdown_type = $2
-     AND is_deleted = false
      AND is_active = true
      ORDER BY sort_order`,
     [tenantId, type]
@@ -25,7 +24,6 @@ async function getAll(tenantId) {
     `SELECT dropdown_type, id, dropdown_value, dropdown_code, sort_order
      FROM list_dropdowns
      WHERE tenant_id = $1
-     AND is_deleted = false
      AND is_active = true
      ORDER BY dropdown_type, sort_order`,
     [tenantId]

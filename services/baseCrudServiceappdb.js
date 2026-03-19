@@ -8,7 +8,7 @@ async function getById(table, tenantId, id) {
      FROM ${table}
      WHERE id = $1
      AND tenant_id = $2
-     AND is_deleted = false`,
+     AND is_active = true`,
     [id, tenantId]
   );
 
@@ -22,7 +22,7 @@ async function getAll(table, tenantId) {
     `SELECT *
      FROM ${table}
      WHERE tenant_id = $1
-     AND is_deleted = false
+     AND is_active = true
      ORDER BY created_at DESC`,
     [tenantId]
   );
@@ -79,9 +79,9 @@ async function softDelete(table, tenantId, userId, id) {
 
   await db.query(
     `UPDATE ${table}
-     SET is_deleted = true,
-         deleted_at = now(),
-         deleted_by = $2
+     SET is_active = false,
+         deactivated_at = now(),
+         deactivated_by = $2
      WHERE id = $3
      AND tenant_id = $1`,
     [tenantId, userId, id]
