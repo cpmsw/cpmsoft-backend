@@ -12,8 +12,8 @@ function mapRow(r) {
 
   return {
     id: r.id,
-    firstname: r.firstname,
-    lastname: r.lastname,
+    first_name: r.first_name,
+    last_name: r.last_name,
     email: r.email,
     role: r.role,
     is_active: r.is_active
@@ -45,11 +45,11 @@ async function getUsers(tenantId, search) {
      WHERE tenant_id = $1
      AND is_deleted = false
      AND (
-        firstname ILIKE $2 OR
-        lastname ILIKE $2 OR
+        first_name ILIKE $2 OR
+        last_name ILIKE $2 OR
         email ILIKE $2
      )
-     ORDER BY firstname
+     ORDER BY first_name
      LIMIT 100`,
     [tenantId, term]
   );
@@ -79,13 +79,13 @@ async function create(tenantId, userId, data) {
   if (!data.password) {
     throw new Error("Password is required");
   }
-  if (!data.firstname || !data.lastname || !data.email) {
+  if (!data.first_name || !data.last_name || !data.email) {
     throw new Error("Missing required fields");
   }
   const password_hash = await bcrypt.hash(data.password, 10);
   const payload = {
-    firstname: data.firstname,
-    lastname: data.lastname,
+    first_name: data.first_name,
+    last_name: data.last_name,
     email: data.email,
     password_hash,
     role: data.role ?? "user",
@@ -106,8 +106,8 @@ async function create(tenantId, userId, data) {
 async function update(tenantId, userId, id, data) {
 
   const payload = {
-    firstname: data.firstname,
-    lastname: data.lastname,
+    first_name: data.first_name,
+    last_name: data.last_name,
     email: data.email,
     role: data.role,
     is_active: data.is_active
@@ -165,7 +165,7 @@ async function inviteUser(tenantId, adminId, data) {
 
   await db.query(
     `INSERT INTO users
-     (tenant_id,email,firstname,lastname,role,
+     (tenant_id,email,first_name,last_name,role,
       password_hash,is_verified,
       verification_code,verification_expires,
       created_by)
@@ -175,8 +175,8 @@ async function inviteUser(tenantId, adminId, data) {
     [
       tenantId,
       email,
-      data.firstname,
-      data.lastname,
+      data.first_name,
+      data.last_name,
       data.role || 'user',
       code,
       expires,

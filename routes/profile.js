@@ -10,14 +10,14 @@ module.exports = async function profileRoutes(fastify) {
     preHandler: verifyToken
   }, async (request, reply) => {
 
-    const { firstname, lastname } = request.body;
+    const { first_name, last_name } = request.body;
 
     await db.query(
       `UPDATE users
-       SET firstname = $1,
-           lastname = $2
+       SET first_name = $1,
+           last_name = $2
        WHERE id = $3`,
-      [firstname, lastname, request.user.userId]
+      [first_name, last_name, request.user.userId]
     );
 
     return { success: true };

@@ -61,7 +61,7 @@ module.exports = async function authRoutes(fastify) {
     const { email, password } = request.body;
 
     const result = await db.query(
-      `SELECT id,email,firstname,lastname,tenant_id,role,
+      `SELECT id,email,first_name,last_name,tenant_id,role,
             password_hash,is_active
      FROM users
      WHERE email = $1
@@ -126,7 +126,7 @@ module.exports = async function authRoutes(fastify) {
     const { email, password } = request.body;
 
     const result = await db.query(
-      `SELECT id,email,firstname,lastname,tenant_id,role,
+      `SELECT id,email,first_name,last_name,tenant_id,role,
               password_hash,twofa_required,twofa_enabled,
               twofa_secret,theme_mode,accent_theme,is_active,
        is_verified
@@ -198,8 +198,8 @@ module.exports = async function authRoutes(fastify) {
       user: {
         id: user.id,
         email: user.email,
-        firstname: user.firstname,
-        lastname: user.lastname,
+        first_name: user.first_name,
+        last_name: user.last_name,
         tenant_id: user.tenant_id,
         role: user.role,
         twofaRequired: user.twofa_required,
@@ -230,7 +230,7 @@ module.exports = async function authRoutes(fastify) {
     const { email } = request.body;
 
     const result = await db.query(
-      `SELECT id, firstname
+      `SELECT id, first_name
      FROM users
      WHERE email = $1
        AND is_deleted = false`,
@@ -524,8 +524,8 @@ module.exports = async function authRoutes(fastify) {
       user: {
         id: user.id,
         email: user.email,
-        firstname: user.firstname,
-        lastname: user.lastname,
+        first_name: user.first_name,
+        last_name: user.last_name,
         tenant_id: user.tenant_id,
         role: user.role,
         twofaRequired: true,
@@ -597,16 +597,16 @@ module.exports = async function authRoutes(fastify) {
     schema: {
       body: {
         type: 'object',
-        required: ['email', 'firstname', 'lastname'],
+        required: ['email', 'first_name', 'last_name'],
         properties: {
           email: {
             type: 'string',
             format: 'email'
           },
-          firstname: {
+          first_name: {
             type: 'string'
           },
-          lastname: {
+          last_name: {
             type: 'string'
           },
           role: {
@@ -621,15 +621,15 @@ module.exports = async function authRoutes(fastify) {
     const tenantId = request.user.tenantId;
     const adminId = request.user.userId;
 
-    const { email, firstname, lastname, role } = request.body;
+    const { email, first_name, last_name, role } = request.body;
 
     return service.inviteUser(
       tenantId,
       adminId,
       {
         email,
-        firstname,
-        lastname,
+        first_name,
+        last_name,
         role
       }
     );
