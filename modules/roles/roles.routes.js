@@ -1,5 +1,6 @@
 const verifyToken = require('../../middleware/verifyToken');
 const service = require('./roles.service');
+const requirePermission = require('../../middleware/requirePermission');
 
 module.exports = async function (fastify) {
 
@@ -7,7 +8,8 @@ module.exports = async function (fastify) {
   // GET ROLES
   // -----------------------------
   fastify.get('/', {
-    preHandler: verifyToken,
+    preHandler: [verifyToken,
+    requirePermission('roles.view')],
     schema: {
       querystring: {
         type: 'object',
@@ -41,7 +43,7 @@ module.exports = async function (fastify) {
   // CREATE
   // -----------------------------
   fastify.post('/', {
-    preHandler: verifyToken,
+    preHandler: [verifyToken,requirePermission('roles.create')],
     schema: {
       body: {
         type: 'object',
@@ -65,7 +67,7 @@ module.exports = async function (fastify) {
   // UPDATE
   // -----------------------------
   fastify.put('/:id', {
-  preHandler: verifyToken,
+  preHandler: [verifyToken,requirePermission('roles.edit')],
   schema: {
     body: {
       type: 'object',
@@ -94,7 +96,7 @@ module.exports = async function (fastify) {
   // DELETE
   // -----------------------------
   fastify.delete('/:id', {
-    preHandler: verifyToken
+    preHandler: [verifyToken,requirePermission('roles.edit')]
   }, async (request) => {
 
     const tenantId = request.user.tenantId;

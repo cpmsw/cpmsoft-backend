@@ -1,11 +1,13 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../../db/authDb');
+const appDb = require('../../db/appDb');
 const verifyToken = require('../../middleware/verifyToken');
 const speakeasy = require("speakeasy");
 const QRCode = require("qrcode");
 const { sendEmail } = require('../../services/emailService');
 const service = require('../users/users.service');
+const accessService = require('../../services/access.service');
 
 module.exports = async function authRoutes(fastify) {
 
@@ -110,6 +112,7 @@ module.exports = async function authRoutes(fastify) {
   // -----------------------------
   // LOGIN
   // -----------------------------
+
   fastify.post('/login', {
     schema: {
       body: {
@@ -126,15 +129,15 @@ module.exports = async function authRoutes(fastify) {
     const { email, password } = request.body;
 
     const result = await db.query(
-      `SELECT id,email,first_name,last_name,tenant_id,role,
-              password_hash,twofa_required,twofa_enabled,
-              twofa_secret,theme_mode,accent_theme,is_active,
-       is_verified
-       FROM users
-       WHERE email = $1
-         AND is_active = true
-        AND is_active = true
-         AND is_unsubscribed = false LIMIT 1` ,
+      `SELECT id, email, first_name, last_name, tenant_id,
+            password_hash, twofa_required, twofa_enabled,
+            twofa_secret, theme_mode, accent_theme,
+            is_active, is_verified, is_unsubscribed
+     FROM users
+     WHERE email = $1
+       AND is_active = true
+       AND is_unsubscribed = false
+     LIMIT 1`,
       [email]
     );
 
@@ -144,20 +147,25 @@ module.exports = async function authRoutes(fastify) {
 
     const user = result.rows[0];
 
-    // HR TERMINATION PROTECTION
-    if (user.is_active === false) {
-      return reply.code(403).send({ error: "Account disabled. Contact administrator." });
+    // EXTRA SAFETY
+    if (!user.is_active) {
+      return reply.code(403).send({
+        error: "Account disabled. Contact administrator."
+      });
     }
 
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
       return reply.code(401).send({ error: 'Invalid login' });
     }
+
     if (!user.is_verified) {
-      return reply.code(403).send({ error: "Account not activated. Please activate your account first." });
+      return reply.code(403).send({
+        error: "Account not activated. Please activate your account first."
+      });
     }
 
-    // 🔐 2FA Enforcement
+    // 🔐 2FA FLOW (UNCHANGED)
     if (user.twofa_required) {
 
       if (!user.twofa_enabled || !user.twofa_secret) {
@@ -174,25 +182,57 @@ module.exports = async function authRoutes(fastify) {
       };
     }
 
+    // -----------------------------
+    // 🔥 RESOLVE PERMISSIONS
+    // -----------------------------
+    const permissions = await accessService.getUserPermissions(
+      user.tenant_id,
+      user.id
+    );
+
+    // OPTIONAL: also get role IDs (for UI if needed later)
+    const rolesResult = await appDb.query(
+      `SELECT r.role_code
+     FROM user_roles ur
+     JOIN roles r ON r.id = ur.role_id
+     WHERE ur.tenant_id = $1
+       AND ur.user_id = $2
+       AND ur.is_active = true`,
+      [user.tenant_id, user.id]
+    );
+
+    const roles = rolesResult.rows.map(r => r.role_code);
+
+    // -----------------------------
+    // UPDATE LAST LOGIN
+    // -----------------------------
     await db.query(
       `UPDATE users
-   SET last_login_at = now()
-   WHERE id = $1`,
+     SET last_login_at = now()
+     WHERE id = $1`,
       [user.id]
     );
 
-    // Normal login
+    // -----------------------------
+    // 🔐 JWT TOKEN (UPDATED)
+    // -----------------------------
     const token = jwt.sign(
       {
         userId: user.id,
         email: user.email,
-        tenant_id: user.tenant_id,
-        role: user.role
+        tenantId: user.tenant_id,
+
+        // 🔥 NEW
+        roles,
+        permissions
       },
       process.env.JWT_SECRET,
       { expiresIn: '8h' }
     );
 
+    // -----------------------------
+    // RESPONSE
+    // -----------------------------
     return {
       token,
       user: {
@@ -201,14 +241,17 @@ module.exports = async function authRoutes(fastify) {
         first_name: user.first_name,
         last_name: user.last_name,
         tenant_id: user.tenant_id,
-        role: user.role,
+
+        // optional (for UI)
+        roles,
+
         twofaRequired: user.twofa_required,
         themeMode: user.theme_mode || 'dark',
         accentTheme: user.accent_theme || 'theme-blue'
       }
     };
-  });
 
+  });
 
   // -----------------------------
   // SEND RESET CODE (PUBLIC)
