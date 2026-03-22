@@ -536,6 +536,25 @@ module.exports = async function authRoutes(fastify) {
 
     const user = result.rows[0];
 
+    const permissions = await accessService.getUserPermissions(
+      user.tenant_id,
+      user.id
+    );
+
+    // GET ROLES
+    const rolesResult = await appDb.query(
+      `SELECT r.role_code
+   FROM user_roles ur
+   JOIN roles r ON r.id = ur.role_id
+   WHERE ur.tenant_id = $1
+     AND ur.user_id = $2
+     AND ur.is_active = true`,
+      [user.tenant_id, user.id]
+    );
+
+    const roles = rolesResult.rows.map(r => r.role_code);
+
+
     const verified = speakeasy.totp.verify({
       secret: user.twofa_secret,
       encoding: 'base32',
@@ -555,8 +574,9 @@ module.exports = async function authRoutes(fastify) {
       {
         userId: user.id,
         email: user.email,
-        tenant_id: user.tenant_id,
-        role: user.role
+        tenantId: user.tenant_id,   // ✅ FIXED
+        roles,
+        permissions
       },
       process.env.JWT_SECRET,
       { expiresIn: '8h' }
