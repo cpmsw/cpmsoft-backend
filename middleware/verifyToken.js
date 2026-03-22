@@ -33,7 +33,7 @@ module.exports = async function verifyToken(request, reply) {
     request.user = {
       userId: decoded.userId,
       email: decoded.email,
-      tenantId: decoded.tenant_id,
+      tenantId: decoded.tenantId || decoded.tenant_id,  // ✅ HANDLE BOTH
       role: decoded.role
     };
 
