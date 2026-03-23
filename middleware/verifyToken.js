@@ -34,7 +34,8 @@ module.exports = async function verifyToken(request, reply) {
       userId: decoded.userId,
       email: decoded.email,
       tenantId: decoded.tenantId || decoded.tenant_id,  // ✅ HANDLE BOTH
-      role: decoded.role
+      roles: decoded.roles || [],
+      permissions: decoded.permissions || []
     };
 
   } catch (err) {

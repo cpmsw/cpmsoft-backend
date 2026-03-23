@@ -84,6 +84,7 @@ async function create(tenantId, userId, data) {
   }
   const password_hash = await bcrypt.hash(data.password, 10);
   const payload = {
+    id: data.id,
     first_name: data.first_name,
     last_name: data.last_name,
     email: data.email,

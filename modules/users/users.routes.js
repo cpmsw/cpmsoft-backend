@@ -38,6 +38,7 @@ module.exports = async function (fastify) {
         type: "object",
         required: ["first_name", "last_name", "email", "password"],
         properties: {
+          id: { type: "string", format: "uuid", nullable: true },
           first_name: { type: "string" },
           last_name: { type: "string" },
           email: { type: "string" },
