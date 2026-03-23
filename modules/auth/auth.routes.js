@@ -8,8 +8,12 @@ const QRCode = require("qrcode");
 const { sendEmail } = require('../../services/emailService');
 const service = require('../users/users.service');
 const accessService = require('../../services/access.service');
+const { buildUserTokenPayload } = require('../../services/auth.service');
 
 module.exports = async function authRoutes(fastify) {
+
+
+
 
   // -----------------------------
   // SHARED PASSWORD UPDATE
@@ -89,17 +93,11 @@ module.exports = async function authRoutes(fastify) {
     //   return reply.code(403).send({ error: 'Swagger login restricted to admins' });
     // }
 
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        email: user.email,
-        tenant_id: user.tenant_id,
-        role: user.role
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '8h' }
-    );
+ const payload = await buildUserTokenPayload(user, appDb, accessService);
 
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: '8h'
+    });
     return {
       token
     };
@@ -216,20 +214,11 @@ module.exports = async function authRoutes(fastify) {
     // -----------------------------
     // 🔐 JWT TOKEN (UPDATED)
     // -----------------------------
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        email: user.email,
-        tenantId: user.tenant_id,
+    const payload = await buildUserTokenPayload(user, appDb, accessService);
 
-        // 🔥 NEW
-        roles,
-        permissions
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '8h' }
-    );
-
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: '8h'
+    });
     // -----------------------------
     // RESPONSE
     // -----------------------------
@@ -523,7 +512,7 @@ module.exports = async function authRoutes(fastify) {
   // -----------------------------
   fastify.post('/2fa/login-verify', async (request, reply) => {
 
-    const { userId, token } = request.body;
+    const { userId, token: otp } = request.body;
 
     const result = await db.query(
       `SELECT * FROM users WHERE id = $1`,
@@ -558,7 +547,7 @@ module.exports = async function authRoutes(fastify) {
     const verified = speakeasy.totp.verify({
       secret: user.twofa_secret,
       encoding: 'base32',
-      token
+      token: otp
     });
 
     if (!verified) {
@@ -570,20 +559,16 @@ module.exports = async function authRoutes(fastify) {
       [userId]
     );
 
-    const jwtToken = jwt.sign(
-      {
-        userId: user.id,
-        email: user.email,
-        tenantId: user.tenant_id,   // ✅ FIXED
-        roles,
-        permissions
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '8h' }
-    );
+    // build payload
+    const payload = await buildUserTokenPayload(user, appDb, accessService);
+
+    // generate JWT
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: '8h'
+    });
 
     return {
-      token: jwtToken,
+      token: token,
       user: {
         id: user.id,
         email: user.email,

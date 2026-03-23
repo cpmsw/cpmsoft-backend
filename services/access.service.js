@@ -6,7 +6,7 @@ const db = require('../db/appDb');
 async function getUserPermissions(tenantId, userId) {
 
         const dbCheck = await db.query('SELECT current_database()');
-    console.log("CONNECTED DB:", dbCheck.rows[0].current_database);
+    // console.log("CONNECTED DB:", dbCheck.rows[0].current_database);
 
 
     const result = await db.query(
