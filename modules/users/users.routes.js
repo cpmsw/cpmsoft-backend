@@ -36,14 +36,13 @@ module.exports = async function (fastify) {
     schema: {
       body: {
         type: "object",
-        required: ["first_name", "last_name", "email", "password"],
+        required: ["first_name", "last_name", "email"],
         properties: {
           id: { type: "string", format: "uuid", nullable: true },
           first_name: { type: "string" },
           last_name: { type: "string" },
           email: { type: "string" },
           password: { type: "string" },
-          role: { type: "string" },
           is_active: { type: "boolean" }
         }
       }

@@ -76,22 +76,24 @@ async function create(tenantId, userId, data) {
   if (!data) {
     throw new Error("Request body missing");
   }
-  if (!data.password) {
-    throw new Error("Password is required");
-  }
+  // if (!data.password) {
+  //   throw new Error("Password is required");
+  // }
   if (!data.first_name || !data.last_name || !data.email) {
     throw new Error("Missing required fields");
   }
-  const password_hash = await bcrypt.hash(data.password, 10);
-  const payload = {
-    id: data.id,
-    first_name: data.first_name,
-    last_name: data.last_name,
-    email: data.email,
-    password_hash,
-    role: data.role ?? "user",
-    is_active: data.is_active ?? true
-  };
+  const password_hash = data.password
+    ? await bcrypt.hash(data.password, 10)
+    : null;
+
+const payload = {
+  id: data.id,
+  first_name: data.first_name,
+  last_name: data.last_name,
+  email: data.email,
+  password_hash,
+  is_active: data.is_active ?? true
+};
 
   const row = await crud.create(
     db,

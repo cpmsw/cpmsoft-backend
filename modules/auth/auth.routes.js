@@ -67,7 +67,7 @@ module.exports = async function authRoutes(fastify) {
     const { email, password } = request.body;
 
     const result = await db.query(
-      `SELECT id,email,first_name,last_name,tenant_id,role,
+      `SELECT id,email,first_name,last_name,tenant_id,
             password_hash,is_active
      FROM users
      WHERE email = $1
