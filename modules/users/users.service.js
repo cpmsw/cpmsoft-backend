@@ -1,3 +1,4 @@
+const { deprecate } = require('util');
 const db = require('../../db/authDb');
 const crud = require('../../services/baseCrudService');
 const bcrypt = require("bcrypt");
@@ -15,8 +16,12 @@ function mapRow(r) {
     first_name: r.first_name,
     last_name: r.last_name,
     email: r.email,
+    phone: r.phone,
+    job_title: r.job_title,
+    department: r.department,
     role: r.role,
-    is_active: r.is_active
+    is_active: r.is_active,
+    twofa_required: r.twofa_required
   };
 }
 
@@ -86,14 +91,18 @@ async function create(tenantId, userId, data) {
     ? await bcrypt.hash(data.password, 10)
     : null;
 
-const payload = {
-  id: data.id,
-  first_name: data.first_name,
-  last_name: data.last_name,
-  email: data.email,
-  password_hash,
-  is_active: data.is_active ?? true
-};
+  const payload = {
+    id: data.id,
+    first_name: data.first_name,
+    last_name: data.last_name,
+    email: data.email,
+    phone: data.phone,
+    job_title: data.job_title,
+    department: data.department,
+    password_hash,
+    is_active: data.is_active ?? true,
+    twofa_required: data.twofa_required ?? true
+  };
 
   const row = await crud.create(
     db,
@@ -112,8 +121,12 @@ async function update(tenantId, userId, id, data) {
     first_name: data.first_name,
     last_name: data.last_name,
     email: data.email,
+    phone: data.phone,
+    job_title: data.job_title,
+    department: data.department,
     role: data.role,
-    is_active: data.is_active
+    is_active: data.is_active,
+    twofa_required: data.twofa_required
   };
 
   const row = await crud.update(

@@ -42,8 +42,12 @@ module.exports = async function (fastify) {
           first_name: { type: "string" },
           last_name: { type: "string" },
           email: { type: "string" },
+          phone: { type: "string" },
+          job_title: { type: "string" },
+          department: { type: "string" },
           password: { type: "string" },
-          is_active: { type: "boolean" }
+          is_active: { type: "boolean" },
+          twofa_required: { type: "boolean" }
         }
       }
     }
