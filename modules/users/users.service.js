@@ -52,7 +52,7 @@ async function getUsers(tenantId, search) {
      AND (
         first_name ILIKE $2 OR
         last_name ILIKE $2 OR
-        email ILIKE $2
+        LOWER(email) ILIKE LOWER($2)
      )
      ORDER BY first_name
      LIMIT 100`,
@@ -81,12 +81,11 @@ async function create(tenantId, userId, data) {
   if (!data) {
     throw new Error("Request body missing");
   }
-  // if (!data.password) {
-  //   throw new Error("Password is required");
-  // }
+
   if (!data.first_name || !data.last_name || !data.email) {
     throw new Error("Missing required fields");
   }
+
   const password_hash = data.password
     ? await bcrypt.hash(data.password, 10)
     : null;
@@ -95,7 +94,7 @@ async function create(tenantId, userId, data) {
     id: data.id,
     first_name: data.first_name,
     last_name: data.last_name,
-    email: data.email,
+    email: data.email.trim().toLowerCase(),
     phone: data.phone,
     job_title: data.job_title,
     department: data.department,
@@ -104,23 +103,41 @@ async function create(tenantId, userId, data) {
     twofa_required: data.twofa_required ?? true
   };
 
-  const row = await crud.create(
-    db,
-    TABLE,
-    tenantId,
-    userId,
-    payload
-  );
+  try {
+    const row = await crud.create(
+      db,
+      TABLE,
+      tenantId,
+      userId,
+      payload
+    );
 
-  return mapRow(row);
+    return mapRow(row);
+
+  } catch (err) {
+
+    // 🔥 HANDLE UNIQUE EMAIL
+    if (
+      err.code === '23505' &&
+      err.constraint === 'cpmsoft_user_email_key'
+    ) {
+      const error = new Error("A user with this email already exists.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // fallback
+    throw err;
+  }
 }
+
 // -----------------------------
 async function update(tenantId, userId, id, data) {
 
   const payload = {
     first_name: data.first_name,
     last_name: data.last_name,
-    email: data.email,
+    email: data.email?.trim().toLowerCase(),
     phone: data.phone,
     job_title: data.job_title,
     department: data.department,
@@ -129,16 +146,31 @@ async function update(tenantId, userId, id, data) {
     twofa_required: data.twofa_required
   };
 
-  const row = await crud.update(
-    db,
-    TABLE,
-    tenantId,
-    userId,
-    id,
-    payload
-  );
+  try {
+    const row = await crud.update(
+      db,
+      TABLE,
+      tenantId,
+      userId,
+      id,
+      payload
+    );
 
-  return mapRow(row);
+    return mapRow(row);
+
+  } catch (err) {
+
+    if (
+      err.code === '23505' &&
+      err.constraint === 'cpmsoft_user_email_key'
+    ) {
+      const error = new Error("A user with this email already exists.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    throw err;
+  }
 }
 
 // -----------------------------
@@ -204,6 +236,19 @@ async function inviteUser(tenantId, adminId, data) {
   console.log("INVITE CODE:", code);
 
   return { success: true };
+}
+
+
+function handleUniqueError(err) {
+  if (
+    err.code === '23505' &&
+    err.constraint === 'cpmsoft_user_email_key'
+  ) {
+    const error = new Error("A user with this email already exists.");
+    error.statusCode = 400;
+    throw error;
+  }
+  throw err;
 }
 
 

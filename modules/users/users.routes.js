@@ -41,7 +41,8 @@ module.exports = async function (fastify) {
           id: { type: "string", format: "uuid", nullable: true },
           first_name: { type: "string" },
           last_name: { type: "string" },
-          email: { type: "string" },
+          email: { type: 'string', format: 'email' },
+          excludeId: { type: 'string', format: 'uuid', nullable: true },
           phone: { type: "string" },
           job_title: { type: "string" },
           department: { type: "string" },
@@ -84,6 +85,26 @@ module.exports = async function (fastify) {
     return service.softDelete(tenantId, userId, id);
   });
 
+  //CHECK EMAIL
+  fastify.get('/check-email', {
+    preHandler: verifyToken,
+    schema: {
+      querystring: {
+        type: 'object',
+        required: ['email'],
+        properties: {
+          email: { type: 'string', format: 'email' }
+        }
+      }
+    }
+  }, async (request) => {
+
+    const tenantId = request.user.tenantId;
+    const { email } = request.query;
+
+    return service.checkEmailExists(tenantId, email);
+
+  });
 
 
 
