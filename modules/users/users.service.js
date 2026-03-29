@@ -1,6 +1,7 @@
 const { deprecate } = require('util');
 const db = require('../../db/authDb');
 const crud = require('../../services/baseCrudService');
+const { sendEmail } = require('../../services/emailService');
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 
@@ -86,24 +87,42 @@ async function create(tenantId, userId, data) {
     throw new Error("Missing required fields");
   }
 
-  const password_hash = data.password
+  const email = data.email.trim().toLowerCase();
+
+  // 🔐 If password provided → direct create
+  const hasPassword = !!data.password;
+
+  const password_hash = hasPassword
     ? await bcrypt.hash(data.password, 10)
+    : null;
+
+  // 🔑 Generate activation only if no password
+  const code = !hasPassword
+    ? Math.floor(100000 + Math.random() * 900000).toString()
+    : null;
+
+  const expires = !hasPassword
+    ? new Date(Date.now() + 15 * 60 * 1000)
     : null;
 
   const payload = {
     id: data.id,
     first_name: data.first_name,
     last_name: data.last_name,
-    email: data.email.trim().toLowerCase(),
+    email,
     phone: data.phone,
     job_title: data.job_title,
     department: data.department,
     password_hash,
     is_active: data.is_active ?? true,
+    is_verified: hasPassword, // ✅ verified only if password exists
+    verification_code: code,
+    verification_expires: expires,
     twofa_required: data.twofa_required ?? true
   };
 
   try {
+
     const row = await crud.create(
       db,
       TABLE,
@@ -112,11 +131,26 @@ async function create(tenantId, userId, data) {
       payload
     );
 
+    // 📧 Send invite email ONLY if no password
+    if (!hasPassword) {
+
+      await sendEmail({
+        to: email,
+        subject: 'CPMSOFT Account Activation',
+        text: `Your activation code is: ${code}. This code expires in 15 minutes.`,
+        html: `
+          <p>You’ve been invited to CPMSOFT.</p>
+          <p>Your activation code is:</p>
+          <h2>${code}</h2>
+          <p>This code expires in 15 minutes.</p>
+        `
+      });
+    }
+
     return mapRow(row);
 
   } catch (err) {
 
-    // 🔥 HANDLE UNIQUE EMAIL
     if (
       err.code === '23505' &&
       err.constraint === 'cpmsoft_user_email_key'
@@ -126,7 +160,6 @@ async function create(tenantId, userId, data) {
       throw error;
     }
 
-    // fallback
     throw err;
   }
 }
@@ -203,6 +236,44 @@ async function softDelete(tenantId, adminId, userId) {
 }
 
 
+async function resendInvite(tenantId, userId) {
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+  const expires = new Date();
+  expires.setMinutes(expires.getMinutes() + 15);
+
+  const result = await db.query(
+    `UPDATE users
+     SET verification_code = $1,
+         verification_expires = $2
+     WHERE id = $3 AND tenant_id = $4
+     RETURNING email, first_name`,
+    [code, expires, userId, tenantId]
+  );
+
+  if (!result.rowCount) {
+    throw new Error("User not found");
+  }
+
+  const user = result.rows[0];
+
+  await sendEmail({
+    to: user.email,
+    subject: 'CPMSOFT Account Activation',
+    text: `Your activation code is: ${code}. This code expires in 15 minutes.`,
+    html: `
+      <p>Your activation code is:</p>
+      <h2>${code}</h2>
+      <p>This code expires in 15 minutes.</p>
+    `
+  });
+
+  return { success: true };
+}
+
+
+
 async function inviteUser(tenantId, adminId, data) {
 
   const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -239,17 +310,6 @@ async function inviteUser(tenantId, adminId, data) {
 }
 
 
-function handleUniqueError(err) {
-  if (
-    err.code === '23505' &&
-    err.constraint === 'cpmsoft_user_email_key'
-  ) {
-    const error = new Error("A user with this email already exists.");
-    error.statusCode = 400;
-    throw error;
-  }
-  throw err;
-}
 
 
 async function activateUser(email, code, password) {
@@ -272,7 +332,7 @@ async function activateUser(email, code, password) {
 
   const user = result.rows[0];
 
-  if (user.verification_code !== code) {
+  if (user.verification_code !== code.trim()) {
     throw new Error("Invalid verification code");
   }
 
@@ -302,6 +362,6 @@ module.exports = {
   create,
   update,
   softDelete,
-  inviteUser,
+  resendInvite,
   activateUser
 };
