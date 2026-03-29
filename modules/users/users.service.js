@@ -236,7 +236,7 @@ async function softDelete(tenantId, adminId, userId) {
 }
 
 
-async function resendInvite(tenantId, userId) {
+async function resendInvite(tenantId, targetUserId) {
 
   const code = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -249,7 +249,7 @@ async function resendInvite(tenantId, userId) {
          verification_expires = $2
      WHERE id = $3 AND tenant_id = $4
      RETURNING email, first_name`,
-    [code, expires, userId, tenantId]
+    [code, expires, targetUserId, tenantId]
   );
 
   if (!result.rowCount) {
@@ -269,9 +269,12 @@ async function resendInvite(tenantId, userId) {
     `
   });
 
-  return { success: true };
+  return {
+    success: true,
+    email: user.email,
+    message: "Activation code sent successfully"
+  };
 }
-
 
 
 async function inviteUser(tenantId, adminId, data) {
@@ -308,8 +311,6 @@ async function inviteUser(tenantId, adminId, data) {
 
   return { success: true };
 }
-
-
 
 
 async function activateUser(email, code, password) {

@@ -106,6 +106,26 @@ module.exports = async function (fastify) {
 
   });
 
+  //RESEND-INVITE
+  fastify.post('/resend-invite/:id', {
+    preHandler: verifyToken,
+    schema: {
+      summary: 'Resend activation code',
+      tags: ['Users'],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: {
+          id: { type: 'string', format: 'uuid' }
+        }
+      }
+    }
+  }, async (request) => {
 
+    const tenantId = request.user.tenantId;
+    const { id } = request.params;
+
+    return service.resendInvite(tenantId, id);
+  });
 
 };
