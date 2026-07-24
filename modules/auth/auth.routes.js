@@ -93,7 +93,7 @@ module.exports = async function authRoutes(fastify) {
     //   return reply.code(403).send({ error: 'Swagger login restricted to admins' });
     // }
 
- const payload = await buildUserTokenPayload(user, appDb, accessService);
+    const payload = await buildUserTokenPayload(user, appDb, accessService);
 
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: '8h'
@@ -660,6 +660,9 @@ module.exports = async function authRoutes(fastify) {
           role: {
             type: 'string',
             enum: ['admin', 'manager', 'user', 'viewer']
+          },
+          twofa_required: {
+            type: 'boolean'
           }
         }
       }
@@ -669,7 +672,7 @@ module.exports = async function authRoutes(fastify) {
     const tenantId = request.user.tenantId;
     const adminId = request.user.userId;
 
-    const { email, first_name, last_name, role } = request.body;
+    const { email, first_name, last_name, role,twofa_required } = request.body;
 
     return service.inviteUser(
       tenantId,
@@ -678,7 +681,8 @@ module.exports = async function authRoutes(fastify) {
         email,
         first_name,
         last_name,
-        role
+        role,
+        twofa_required
       }
     );
 

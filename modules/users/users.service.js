@@ -1,11 +1,178 @@
-const { deprecate } = require('util');
+
 const db = require('../../db/authDb');
 const crud = require('../../services/baseCrudService');
 const { sendEmail } = require('../../services/emailService');
 const bcrypt = require("bcrypt");
-const crypto = require("crypto");
+
 
 const TABLE = "users";
+
+const ACTIVATION_URL = "https://cpmsoft.app/activate";
+
+function buildActivationEmail({
+  firstName,
+  code,
+  twofaRequired
+}) {
+  const greeting = firstName
+    ? `Hello ${firstName},`
+    : "Hello,";
+
+  const twofaText = twofaRequired
+    ? `
+After activating your account, CPMSOFT will ask you to set up two-factor authentication.
+
+Before signing in, please install Google Authenticator on your phone:
+
+iPhone or iPad:
+https://apps.apple.com/app/google-authenticator/id388497605
+
+Android:
+https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2
+`
+    : "";
+
+  const twofaHtml = twofaRequired
+    ? `
+      <div style="
+        margin-top:24px;
+        padding:16px;
+        background:#f4f6f8;
+        border:1px solid #d8dde3;
+        border-radius:6px;
+      ">
+        <h3 style="margin-top:0;">
+          Two-Factor Authentication
+        </h3>
+
+        <p>
+          After activating your account, CPMSOFT will ask you
+          to set up two-factor authentication.
+        </p>
+
+        <p>
+          Please install <strong>Google Authenticator</strong>
+          on your phone before signing in:
+        </p>
+
+        <p>
+          <a href="https://apps.apple.com/app/google-authenticator/id388497605">
+            Download for iPhone or iPad
+          </a>
+        </p>
+
+        <p>
+          <a href="https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2">
+            Download for Android
+          </a>
+        </p>
+
+        <p style="margin-bottom:0;">
+          During your first sign-in, CPMSOFT will display a QR
+          code. Scan that QR code using Google Authenticator,
+          then enter the six-digit code shown in the app.
+        </p>
+      </div>
+    `
+    : "";
+
+  return {
+    subject: "Welcome to CPMSOFT – Activate Your Account",
+
+    text: `
+${greeting}
+
+Your CPMSOFT account has been created.
+
+Activation code:
+
+${code}
+
+Activate your account here:
+
+${ACTIVATION_URL}
+
+This activation code expires in 15 minutes.
+${twofaText}
+If you were not expecting this invitation, you may safely ignore this email.
+`.trim(),
+
+    html: `
+      <div style="
+        max-width:600px;
+        font-family:Arial,sans-serif;
+        font-size:15px;
+        line-height:1.6;
+        color:#222;
+      ">
+        <p>${greeting}</p>
+
+        <p>Your CPMSOFT account has been created.</p>
+
+        <p><strong>Your activation code is:</strong></p>
+
+        <div style="
+          display:inline-block;
+          padding:12px 20px;
+          margin:5px 0 15px;
+          font-size:28px;
+          font-weight:bold;
+          letter-spacing:5px;
+          background:#f4f6f8;
+          border:1px solid #d8dde3;
+          border-radius:6px;
+        ">
+          ${code}
+        </div>
+
+        <p>
+          This activation code expires in
+          <strong>15 minutes</strong>.
+        </p>
+
+        <p>
+          <a
+            href="${ACTIVATION_URL}"
+            style="
+              display:inline-block;
+              padding:11px 18px;
+              background:#1769aa;
+              color:#fff;
+              text-decoration:none;
+              border-radius:5px;
+              font-weight:bold;
+            "
+          >
+            Activate Your Account
+          </a>
+        </p>
+
+        <p>
+          You may also copy and paste this address into your browser:
+        </p>
+
+        <p>
+          <a href="${ACTIVATION_URL}">
+            ${ACTIVATION_URL}
+          </a>
+        </p>
+
+        ${twofaHtml}
+
+        <hr style="
+          margin-top:25px;
+          border:0;
+          border-top:1px solid #ddd;
+        ">
+
+        <p style="font-size:13px;color:#666;">
+          If you were not expecting this invitation, you may
+          safely ignore this email.
+        </p>
+      </div>
+    `
+  };
+}
 
 // -----------------------------
 function mapRow(r) {
@@ -133,17 +300,15 @@ async function create(tenantId, userId, data) {
 
     // 📧 Send invite email ONLY if no password
     if (!hasPassword) {
+      const activationEmail = buildActivationEmail({
+        firstName: data.first_name,
+        code,
+        twofaRequired: data.twofa_required ?? true
+      });
 
       await sendEmail({
         to: email,
-        subject: 'CPMSOFT Account Activation',
-        text: `Your activation code is: ${code}. This code expires in 15 minutes.`,
-        html: `
-          <p>You’ve been invited to CPMSOFT.</p>
-          <p>Your activation code is:</p>
-          <h2>${code}</h2>
-          <p>This code expires in 15 minutes.</p>
-        `
+        ...activationEmail
       });
     }
 
@@ -248,7 +413,7 @@ async function resendInvite(tenantId, targetUserId) {
      SET verification_code = $1,
          verification_expires = $2
      WHERE id = $3 AND tenant_id = $4
-     RETURNING email, first_name`,
+     RETURNING email, first_name, twofa_required`,
     [code, expires, targetUserId, tenantId]
   );
 
@@ -258,15 +423,15 @@ async function resendInvite(tenantId, targetUserId) {
 
   const user = result.rows[0];
 
+  const activationEmail = buildActivationEmail({
+    firstName: user.first_name,
+    code,
+    twofaRequired: user.twofa_required === true
+  });
+
   await sendEmail({
     to: user.email,
-    subject: 'CPMSOFT Account Activation',
-    text: `Your activation code is: ${code}. This code expires in 15 minutes.`,
-    html: `
-      <p>Your activation code is:</p>
-      <h2>${code}</h2>
-      <p>This code expires in 15 minutes.</p>
-    `
+    ...activationEmail
   });
 
   return {
@@ -279,39 +444,86 @@ async function resendInvite(tenantId, targetUserId) {
 
 async function inviteUser(tenantId, adminId, data) {
 
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  if (!data?.email || !data?.first_name || !data?.last_name) {
+    throw new Error("Missing required fields");
+  }
 
-  const expires = new Date(Date.now() + 15 * 60 * 1000);
+  const code = Math.floor(
+    100000 + Math.random() * 900000
+  ).toString();
 
-  const email = data.email.toLowerCase().trim();
-
-  await db.query(
-    `INSERT INTO users
-     (tenant_id,email,first_name,last_name,role,
-      password_hash,is_verified,
-      verification_code,verification_expires,
-      created_by)
-     VALUES ($1,$2,$3,$4,$5,
-             NULL,false,
-             $6,$7,$8)`,
-    [
-      tenantId,
-      email,
-      data.first_name,
-      data.last_name,
-      data.role || 'user',
-      code,
-      expires,
-      adminId
-    ]
+  const expires = new Date(
+    Date.now() + 15 * 60 * 1000
   );
 
-  // TODO: send email later
-  console.log("INVITE CODE:", code);
+  const email = data.email.trim().toLowerCase();
+  const twofaRequired = data.twofa_required ?? true;
 
-  return { success: true };
+  try {
+    await db.query(
+      `INSERT INTO users
+       (
+         tenant_id,
+         email,
+         first_name,
+         last_name,
+         role,
+         password_hash,
+         is_active,
+         is_verified,
+         verification_code,
+         verification_expires,
+         twofa_required,
+         created_by
+       )
+       VALUES (
+         $1, $2, $3, $4, $5,
+         NULL, true, false,
+         $6, $7, $8, $9
+       )`,
+      [
+        tenantId,
+        email,
+        data.first_name,
+        data.last_name,
+        data.role || "user",
+        code,
+        expires,
+        twofaRequired,
+        adminId
+      ]
+    );
+
+    const activationEmail = buildActivationEmail({
+      firstName: data.first_name,
+      code,
+      twofaRequired
+    });
+
+    await sendEmail({
+      to: email,
+      ...activationEmail
+    });
+
+    return {
+      success: true,
+      email,
+      message: "Invitation sent successfully"
+    };
+
+  } catch (err) {
+
+    if (err.code === "23505") {
+      const error = new Error(
+        "A user with this email already exists."
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+
+    throw err;
+  }
 }
-
 
 async function activateUser(email, code, password) {
 
@@ -324,7 +536,7 @@ async function activateUser(email, code, password) {
     `SELECT id, verification_code, verification_expires
      FROM users
      WHERE email = $1`,
-    [email.toLowerCase()]
+    [emailNormalized]
   );
 
   if (!result.rowCount) {
@@ -364,5 +576,6 @@ module.exports = {
   update,
   softDelete,
   resendInvite,
+  inviteUser,
   activateUser
 };
