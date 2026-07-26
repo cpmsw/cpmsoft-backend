@@ -176,7 +176,6 @@ If you were not expecting this invitation, you may safely ignore this email.
 
 // -----------------------------
 function mapRow(r) {
-
   if (!r) return null;
 
   return {
@@ -188,11 +187,15 @@ function mapRow(r) {
     job_title: r.job_title,
     department: r.department,
     role: r.role,
+
     is_active: r.is_active,
-    twofa_required: r.twofa_required
+    is_verified: r.is_verified,
+    verified_at: r.verified_at,
+
+    twofa_required: r.twofa_required,
+    twofa_enabled: r.twofa_enabled
   };
 }
-
 // -----------------------------
 async function countUsers(tenantId) {
 
@@ -526,48 +529,111 @@ async function inviteUser(tenantId, adminId, data) {
 }
 
 async function activateUser(email, code, password) {
+  const emailNormalized = String(email || "").trim().toLowerCase();
+  const codeNormalized = String(code || "").trim();
 
-  const emailNormalized = email.toLowerCase().trim();
+  if (!emailNormalized || !codeNormalized || !password) {
+    const error = new Error(
+      "Email, verification code, and password are required."
+    );
+    error.statusCode = 400;
+    error.code = "ACTIVATION_FIELDS_REQUIRED";
+    throw error;
+  }
 
-  console.log("ACTIVATE EMAIL:", emailNormalized);
-  console.log("ACTIVATE CODE RECEIVED:", code);
+  if (!/^(?=.*\d).{8,}$/.test(password)) {
+    const error = new Error(
+      "Password must be at least 8 characters and contain at least one number."
+    );
+    error.statusCode = 400;
+    error.code = "INVALID_PASSWORD";
+    throw error;
+  }
 
   const result = await db.query(
-    `SELECT id, verification_code, verification_expires
+    `SELECT id,
+            is_verified,
+            verification_code,
+            verification_expires
      FROM users
-     WHERE email = $1`,
+     WHERE LOWER(email) = LOWER($1)
+     LIMIT 1`,
     [emailNormalized]
   );
 
   if (!result.rowCount) {
-    throw new Error("User not found");
+    const error = new Error(
+      "The email address or activation code is invalid."
+    );
+    error.statusCode = 400;
+    error.code = "INVALID_ACTIVATION";
+    throw error;
   }
 
   const user = result.rows[0];
 
-  if (user.verification_code !== code.trim()) {
-    throw new Error("Invalid verification code");
+  if (user.is_verified) {
+    const error = new Error(
+      "This account has already been activated. Please sign in to continue."
+    );
+    error.statusCode = 409;
+    error.code = "ALREADY_ACTIVATED";
+    throw error;
   }
 
-  if (new Date(user.verification_expires) < new Date()) {
-    throw new Error("Verification code expired");
+  if (
+    !user.verification_code ||
+    user.verification_code !== codeNormalized
+  ) {
+    const error = new Error("The activation code is invalid.");
+    error.statusCode = 400;
+    error.code = "INVALID_CODE";
+    throw error;
+  }
+
+  if (
+    !user.verification_expires ||
+    new Date(user.verification_expires) < new Date()
+  ) {
+    const error = new Error(
+      "The activation code has expired. Please ask your administrator to resend the invitation."
+    );
+    error.statusCode = 400;
+    error.code = "CODE_EXPIRED";
+    throw error;
   }
 
   const password_hash = await bcrypt.hash(password, 10);
 
-  await db.query(
+  const updateResult = await db.query(
     `UPDATE users
      SET password_hash = $1,
          is_verified = true,
          verified_at = now(),
          verification_code = NULL,
          verification_expires = NULL
-     WHERE id = $2`,
+     WHERE id = $2
+       AND is_verified = false
+     RETURNING id`,
     [password_hash, user.id]
   );
 
-  return { success: true };
+  if (!updateResult.rowCount) {
+    const error = new Error(
+      "This account has already been activated. Please sign in to continue."
+    );
+    error.statusCode = 409;
+    error.code = "ALREADY_ACTIVATED";
+    throw error;
+  }
+
+  return {
+    success: true,
+    code: "ACTIVATED",
+    message: "Account activated successfully."
+  };
 }
+
 module.exports = {
   countUsers,
   getUsers,

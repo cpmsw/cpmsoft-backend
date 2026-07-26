@@ -691,12 +691,34 @@ module.exports = async function authRoutes(fastify) {
   // ACTIVATE USER
   // -----------------------------
 
-  fastify.post('/activate', async (request, reply) => {
+fastify.post('/activate', async (request, reply) => {
+  const { email, code, password } = request.body;
 
-    const { email, code, password } = request.body;
+  try {
+    const result = await service.activateUser(
+      email,
+      code,
+      password
+    );
 
-    return service.activateUser(email, code, password);
+    return reply.code(200).send(result);
 
-  });
+  } catch (err) {
+    request.log.warn(
+      {
+        activationCode: err.code,
+        email: String(email || "").trim().toLowerCase()
+      },
+      "Account activation failed"
+    );
+
+    return reply.code(err.statusCode || 400).send({
+      success: false,
+      code: err.code || "ACTIVATION_FAILED",
+      message: err.message || "Activation failed."
+    });
+  }
+});
+
 
 };
