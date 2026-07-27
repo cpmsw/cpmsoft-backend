@@ -52,17 +52,32 @@ module.exports = async function (fastify) {
         }
       }
     }
-  }, async (request) => {
-
+  }, async (request, reply) => {
     const tenantId = request.user.tenantId;
     const userId = request.user.userId;
 
-    return service.create(
-      tenantId,
-      userId,
-      request.body
-    );
+    try {
+      const result = await service.create(
+        tenantId,
+        userId,
+        request.body
+      );
 
+      return reply.code(201).send(result);
+
+    } catch (error) {
+      return reply
+        .code(error.statusCode || 400)
+        .send({
+          code: error.code || "USER_SAVE_FAILED",
+          message:
+            error.message ||
+            "The user could not be saved.",
+          userId: error.userId || null,
+          isVerified:
+            error.isVerified === true
+        });
+    }
   });
   // UPDATE USER
   fastify.put('/:id', {
@@ -127,5 +142,20 @@ module.exports = async function (fastify) {
 
     return service.resendInvite(tenantId, id);
   });
+
+  //Reactivate
+  fastify.post("/:id/reactivate",
+    {
+      preHandler: verifyToken
+    },
+    async (request) => {
+
+      return service.reactivateUser(
+        request.user.tenantId,
+        request.params.id
+      );
+
+    }
+  );
 
 };

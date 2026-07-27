@@ -259,6 +259,42 @@ async function create(tenantId, userId, data) {
 
   const email = data.email.trim().toLowerCase();
 
+  const existingResult = await db.query(
+    `SELECT id, is_active, is_verified
+   FROM users
+   WHERE tenant_id = $1
+     AND LOWER(email) = LOWER($2)
+   ORDER BY created_at ASC
+   LIMIT 1`,
+    [tenantId, email]
+  );
+
+  if (existingResult.rowCount) {
+    const existingUser = existingResult.rows[0];
+
+    if (existingUser.is_active === false) {
+      const error = new Error(
+        "This user already exists and is currently deactivated."
+      );
+
+      error.statusCode = 409;
+      error.code = "USER_DEACTIVATED";
+      error.userId = existingUser.id;
+      error.isVerified = existingUser.is_verified;
+
+      throw error;
+    }
+
+    const error = new Error(
+      "A user with this email already exists."
+    );
+
+    error.statusCode = 409;
+    error.code = "USER_ALREADY_EXISTS";
+
+    throw error;
+  }
+
   // 🔐 If password provided → direct create
   const hasPassword = !!data.password;
 
@@ -634,6 +670,75 @@ async function activateUser(email, code, password) {
   };
 }
 
+async function reactivateUser(tenantId, userId) {
+
+  const result = await db.query(
+    `SELECT *
+       FROM users
+      WHERE tenant_id = $1
+        AND id = $2`,
+    [tenantId, userId]
+  );
+
+  if (!result.rowCount) {
+    throw new Error("User not found.");
+  }
+
+  const user = result.rows[0];
+
+  if (user.is_verified) {
+
+    await db.query(
+      `UPDATE users
+          SET is_active = true,
+              deactivated_at = NULL,
+              deactivated_by = NULL
+        WHERE id = $1`,
+      [userId]
+    );
+
+    return {
+      reactivated: true,
+      inviteSent: false
+    };
+  }
+
+  // never activated
+  const code = Math.floor(
+    100000 + Math.random() * 900000
+  ).toString();
+
+  const expires = new Date(
+    Date.now() + 15 * 60 * 1000
+  );
+
+  await db.query(
+    `UPDATE users
+        SET is_active = true,
+            verification_code = $1,
+            verification_expires = $2,
+            deactivated_at = NULL,
+            deactivated_by = NULL
+      WHERE id = $3`,
+    [code, expires, userId]
+  );
+
+  await sendEmail({
+    to: user.email,
+    ...buildActivationEmail({
+      firstName: user.first_name,
+      code,
+      twofaRequired: user.twofa_required
+    })
+  });
+
+  return {
+    reactivated: true,
+    inviteSent: true
+  };
+}
+
+
 module.exports = {
   countUsers,
   getUsers,
@@ -643,5 +748,6 @@ module.exports = {
   softDelete,
   resendInvite,
   inviteUser,
-  activateUser
+  activateUser,
+  reactivateUser
 };
