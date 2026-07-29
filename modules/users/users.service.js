@@ -182,20 +182,26 @@ function mapRow(r) {
     id: r.id,
     first_name: r.first_name,
     last_name: r.last_name,
+    display_name: r.display_name,
     email: r.email,
     phone: r.phone,
     job_title: r.job_title,
     department: r.department,
-    role: r.role,
 
     is_active: r.is_active,
     is_verified: r.is_verified,
     verified_at: r.verified_at,
 
     twofa_required: r.twofa_required,
-    twofa_enabled: r.twofa_enabled
+    twofa_enabled: r.twofa_enabled,
+
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+    last_login_at: r.last_login_at,
+    deactivated_at: r.deactivated_at
   };
 }
+
 // -----------------------------
 async function countUsers(tenantId) {
 
@@ -246,65 +252,229 @@ async function getById(tenantId, id) {
   return mapRow(row);
 }
 
+async function findActiveUserByEmail(
+  email,
+  excludeUserId = null
+) {
+  const values = [email];
+  let excludeClause = "";
+
+  if (excludeUserId) {
+    values.push(excludeUserId);
+    excludeClause = "AND id <> $2";
+  }
+
+  const result = await db.query(
+    `SELECT
+       id,
+       tenant_id,
+       email,
+       is_active,
+       is_verified,
+       first_name,
+       last_name
+     FROM users
+     WHERE LOWER(email) = LOWER($1)
+       AND is_active = true
+       ${excludeClause}
+     ORDER BY created_at ASC
+     LIMIT 1`,
+    values
+  );
+
+  return result.rows[0] || null;
+}
+
+async function findUserInTenantByEmail(tenantId, email) {
+  const result = await db.query(
+    `SELECT
+       id,
+       tenant_id,
+       email,
+       is_active,
+       is_verified
+     FROM users
+     WHERE tenant_id = $1
+       AND LOWER(email) = LOWER($2)
+     ORDER BY created_at ASC
+     LIMIT 1`,
+    [tenantId, email]
+  );
+
+  return result.rows[0] || null;
+}
+
+function createActiveEmailError() {
+  const error = new Error(
+    "This email address is already associated with an active account. " +
+    "Please contact support if you believe this is an error."
+  );
+
+  error.statusCode = 409;
+  error.code = "EMAIL_ACTIVE_IN_ANOTHER_TENANT";
+
+  return error;
+}
+
+async function checkEmailExists(
+  tenantId,
+  email,
+  excludeUserId = null
+) {
+  const normalizedEmail = String(email || "")
+    .trim()
+    .toLowerCase();
+
+  if (!normalizedEmail) {
+    return {
+      exists: false,
+      isActive: false,
+      isDeactivated: false
+    };
+  }
+
+  const activeUser = await findActiveUserByEmail(
+    normalizedEmail,
+    excludeUserId
+  );
+
+  if (activeUser) {
+    const sameTenant =
+      activeUser.tenant_id === tenantId;
+
+    if (sameTenant) {
+      return {
+        exists: true,
+        isActive: true,
+        isDeactivated: false,
+        sameTenant: true,
+        otherTenant: false,
+        userId: activeUser.id,
+        code: "USER_ALREADY_EXISTS"
+      };
+    }
+
+    return {
+      exists: true,
+      isActive: true,
+      isDeactivated: false,
+      sameTenant: false,
+      otherTenant: true,
+      code: "EMAIL_ACTIVE_IN_ANOTHER_TENANT"
+    };
+  }
+
+  const tenantUser =
+    await findUserInTenantByEmail(
+      tenantId,
+      normalizedEmail
+    );
+
+  if (
+    tenantUser &&
+    tenantUser.is_active === false &&
+    tenantUser.id !== excludeUserId
+  ) {
+    return {
+      exists: true,
+      isActive: false,
+      isDeactivated: true,
+      sameTenant: true,
+      otherTenant: false,
+      userId: tenantUser.id,
+      isVerified:
+        tenantUser.is_verified === true,
+      code: "USER_DEACTIVATED"
+    };
+  }
+
+  return {
+    exists: false,
+    isActive: false,
+    isDeactivated: false,
+    sameTenant: false,
+    otherTenant: false
+  };
+}
+
 // -----------------------------
 async function create(tenantId, userId, data) {
-
   if (!data) {
-    throw new Error("Request body missing");
+    const error = new Error("Request body missing.");
+    error.statusCode = 400;
+    error.code = "REQUEST_BODY_MISSING";
+    throw error;
   }
 
   if (!data.first_name || !data.last_name || !data.email) {
-    throw new Error("Missing required fields");
+    const error = new Error(
+      "First name, last name, and email are required."
+    );
+    error.statusCode = 400;
+    error.code = "MISSING_REQUIRED_FIELDS";
+    throw error;
   }
 
   const email = data.email.trim().toLowerCase();
 
-  const existingResult = await db.query(
-    `SELECT id, is_active, is_verified
-   FROM users
-   WHERE tenant_id = $1
-     AND LOWER(email) = LOWER($2)
-   ORDER BY created_at ASC
-   LIMIT 1`,
-    [tenantId, email]
-  );
+  /*
+   * First check for an active account globally.
+   * Only one active account is allowed for an email,
+   * regardless of tenant.
+   */
+  const activeUser = await findActiveUserByEmail(email);
 
-  if (existingResult.rowCount) {
-    const existingUser = existingResult.rows[0];
-
-    if (existingUser.is_active === false) {
+  if (activeUser) {
+    if (activeUser.tenant_id === tenantId) {
       const error = new Error(
-        "This user already exists and is currently deactivated."
+        "A user with this email is already active in this company."
       );
 
       error.statusCode = 409;
-      error.code = "USER_DEACTIVATED";
-      error.userId = existingUser.id;
-      error.isVerified = existingUser.is_verified;
+      error.code = "USER_ALREADY_EXISTS";
+      error.userId = activeUser.id;
+      error.isVerified = activeUser.is_verified === true;
 
       throw error;
     }
 
+    throw createActiveEmailError();
+  }
+
+  /*
+   * No active account exists globally.
+   * Check whether this tenant already has an inactive historical user.
+   */
+  const tenantUser = await findUserInTenantByEmail(
+    tenantId,
+    email
+  );
+
+  if (tenantUser && tenantUser.is_active === false) {
     const error = new Error(
-      "A user with this email already exists."
+      "This user already exists in this company and is currently deactivated."
     );
 
     error.statusCode = 409;
-    error.code = "USER_ALREADY_EXISTS";
+    error.code = "USER_DEACTIVATED";
+    error.userId = tenantUser.id;
+    error.isVerified = tenantUser.is_verified === true;
 
     throw error;
   }
 
-  // 🔐 If password provided → direct create
-  const hasPassword = !!data.password;
+  const hasPassword =
+    typeof data.password === "string" &&
+    data.password.trim().length > 0;
 
   const password_hash = hasPassword
     ? await bcrypt.hash(data.password, 10)
     : null;
 
-  // 🔑 Generate activation only if no password
   const code = !hasPassword
-    ? Math.floor(100000 + Math.random() * 900000).toString()
+    ? Math.floor(
+      100000 + Math.random() * 900000
+    ).toString()
     : null;
 
   const expires = !hasPassword
@@ -313,22 +483,21 @@ async function create(tenantId, userId, data) {
 
   const payload = {
     id: data.id,
-    first_name: data.first_name,
-    last_name: data.last_name,
+    first_name: data.first_name.trim(),
+    last_name: data.last_name.trim(),
     email,
     phone: data.phone,
     job_title: data.job_title,
     department: data.department,
     password_hash,
     is_active: data.is_active ?? true,
-    is_verified: hasPassword, // ✅ verified only if password exists
+    is_verified: hasPassword,
     verification_code: code,
     verification_expires: expires,
     twofa_required: data.twofa_required ?? true
   };
 
   try {
-
     const row = await crud.create(
       db,
       TABLE,
@@ -337,12 +506,12 @@ async function create(tenantId, userId, data) {
       payload
     );
 
-    // 📧 Send invite email ONLY if no password
     if (!hasPassword) {
       const activationEmail = buildActivationEmail({
         firstName: data.first_name,
         code,
-        twofaRequired: data.twofa_required ?? true
+        twofaRequired:
+          data.twofa_required ?? true
       });
 
       await sendEmail({
@@ -352,15 +521,42 @@ async function create(tenantId, userId, data) {
     }
 
     return mapRow(row);
-
   } catch (err) {
-
+    /*
+     * This catches a race condition where two administrators
+     * try to add the same email at nearly the same time.
+     */
     if (
-      err.code === '23505' &&
-      err.constraint === 'cpmsoft_user_email_key'
+      err.code === "23505" &&
+      err.constraint === "cpmsoft_user_email_key"
     ) {
-      const error = new Error("A user with this email already exists.");
-      error.statusCode = 400;
+      const conflictingUser =
+        await findActiveUserByEmail(email);
+
+      if (conflictingUser) {
+        if (conflictingUser.tenant_id === tenantId) {
+          const error = new Error(
+            "A user with this email is already active in this company."
+          );
+
+          error.statusCode = 409;
+          error.code = "USER_ALREADY_EXISTS";
+          error.userId = conflictingUser.id;
+
+          throw error;
+        }
+
+        throw createActiveEmailError();
+      }
+
+      const error = new Error(
+        "This email address is already associated with an active account."
+      );
+
+      error.statusCode = 409;
+      error.code =
+        "EMAIL_ACTIVE_IN_ANOTHER_TENANT";
+
       throw error;
     }
 
@@ -369,40 +565,188 @@ async function create(tenantId, userId, data) {
 }
 
 // -----------------------------
-async function update(tenantId, userId, id, data) {
+async function update(
+  tenantId,
+  adminUserId,
+  id,
+  data
+) {
+  if (!id) {
+    const error = new Error(
+      "User ID is required."
+    );
+
+    error.statusCode = 400;
+    error.code = "USER_ID_REQUIRED";
+
+    throw error;
+  }
+
+  if (!data) {
+    const error = new Error(
+      "Request body missing."
+    );
+
+    error.statusCode = 400;
+    error.code = "REQUEST_BODY_MISSING";
+
+    throw error;
+  }
+
+  const existingResult = await db.query(
+    `SELECT
+       id,
+       tenant_id,
+       email,
+       is_active
+     FROM users
+     WHERE id = $1
+       AND tenant_id = $2
+     LIMIT 1`,
+    [id, tenantId]
+  );
+
+  if (!existingResult.rowCount) {
+    const error = new Error(
+      "User not found."
+    );
+
+    error.statusCode = 404;
+    error.code = "USER_NOT_FOUND";
+
+    throw error;
+  }
+
+  const email = String(data.email || "")
+    .trim()
+    .toLowerCase();
+
+  if (!email) {
+    const error = new Error(
+      "Email is required."
+    );
+
+    error.statusCode = 400;
+    error.code = "EMAIL_REQUIRED";
+
+    throw error;
+  }
+
+  /*
+   * Prevent this user from being changed to an email
+   * that belongs to another active account.
+   */
+  const activeUser =
+    await findActiveUserByEmail(email, id);
+
+  if (activeUser) {
+    if (activeUser.tenant_id === tenantId) {
+      const error = new Error(
+        "Another active user in this company already uses this email address."
+      );
+
+      error.statusCode = 409;
+      error.code = "USER_ALREADY_EXISTS";
+      error.userId = activeUser.id;
+      error.isVerified =
+        activeUser.is_verified === true;
+
+      throw error;
+    }
+
+    throw createActiveEmailError();
+  }
 
   const payload = {
-    first_name: data.first_name,
-    last_name: data.last_name,
-    email: data.email?.trim().toLowerCase(),
-    phone: data.phone,
-    job_title: data.job_title,
-    department: data.department,
-    role: data.role,
-    is_active: data.is_active,
-    twofa_required: data.twofa_required
+    first_name:
+      data.first_name?.trim() || null,
+
+    last_name:
+      data.last_name?.trim() || null,
+
+    display_name:
+      data.display_name?.trim() || null,
+
+    email,
+
+    phone:
+      data.phone?.trim() || null,
+
+    job_title:
+      data.job_title?.trim() || null,
+
+    department:
+      data.department?.trim() || null,
+
+    is_active:
+      data.is_active,
+
+    twofa_required:
+      data.twofa_required
   };
+
+  /*
+   * Remove undefined properties so the CRUD service
+   * does not overwrite existing values unintentionally.
+   */
+  Object.keys(payload).forEach((key) => {
+    if (payload[key] === undefined) {
+      delete payload[key];
+    }
+  });
 
   try {
     const row = await crud.update(
       db,
       TABLE,
       tenantId,
-      userId,
+      adminUserId,
       id,
       payload
     );
 
     return mapRow(row);
-
   } catch (err) {
-
     if (
-      err.code === '23505' &&
-      err.constraint === 'cpmsoft_user_email_key'
+      err.code === "23505" &&
+      err.constraint ===
+      "cpmsoft_user_email_key"
     ) {
-      const error = new Error("A user with this email already exists.");
-      error.statusCode = 400;
+      const conflictingUser =
+        await findActiveUserByEmail(
+          email,
+          id
+        );
+
+      if (conflictingUser) {
+        if (
+          conflictingUser.tenant_id ===
+          tenantId
+        ) {
+          const error = new Error(
+            "Another active user in this company already uses this email address."
+          );
+
+          error.statusCode = 409;
+          error.code =
+            "USER_ALREADY_EXISTS";
+          error.userId =
+            conflictingUser.id;
+
+          throw error;
+        }
+
+        throw createActiveEmailError();
+      }
+
+      const error = new Error(
+        "This email address is already associated with another active account."
+      );
+
+      error.statusCode = 409;
+      error.code =
+        "EMAIL_ACTIVE_IN_ANOTHER_TENANT";
+
       throw error;
     }
 
@@ -439,7 +783,6 @@ async function softDelete(tenantId, adminId, userId) {
   return { success: true };
 }
 
-
 async function resendInvite(tenantId, targetUserId) {
 
   const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -449,17 +792,35 @@ async function resendInvite(tenantId, targetUserId) {
 
   const result = await db.query(
     `UPDATE users
-     SET verification_code = $1,
-         verification_expires = $2
-     WHERE id = $3 AND tenant_id = $4
-     RETURNING email, first_name, twofa_required`,
-    [code, expires, targetUserId, tenantId]
+   SET verification_code = $1,
+       verification_expires = $2,
+       updated_at = now()
+   WHERE id = $3
+     AND tenant_id = $4
+     AND is_active = true
+     AND is_verified = false
+   RETURNING
+     email,
+     first_name,
+     twofa_required`,
+    [
+      code,
+      expires,
+      targetUserId,
+      tenantId
+    ]
   );
-
   if (!result.rowCount) {
-    throw new Error("User not found");
-  }
+    const error = new Error(
+      "The user was not found, is inactive, or has already activated the account."
+    );
 
+    error.statusCode = 400;
+    error.code =
+      "INVITATION_NOT_AVAILABLE";
+
+    throw error;
+  }
   const user = result.rows[0];
 
   const activationEmail = buildActivationEmail({
@@ -480,11 +841,80 @@ async function resendInvite(tenantId, targetUserId) {
   };
 }
 
+async function inviteUser(
+  tenantId,
+  adminId,
+  data
+) {
+  if (
+    !data?.email ||
+    !data?.first_name ||
+    !data?.last_name
+  ) {
+    const error = new Error(
+      "First name, last name, and email are required."
+    );
 
-async function inviteUser(tenantId, adminId, data) {
+    error.statusCode = 400;
+    error.code = "MISSING_REQUIRED_FIELDS";
 
-  if (!data?.email || !data?.first_name || !data?.last_name) {
-    throw new Error("Missing required fields");
+    throw error;
+  }
+
+  const email = data.email
+    .trim()
+    .toLowerCase();
+
+  /*
+   * Only one active account is permitted for an
+   * email across all tenants.
+   */
+  const activeUser =
+    await findActiveUserByEmail(email);
+
+  if (activeUser) {
+    if (activeUser.tenant_id === tenantId) {
+      const error = new Error(
+        "A user with this email is already active in this company."
+      );
+
+      error.statusCode = 409;
+      error.code = "USER_ALREADY_EXISTS";
+      error.userId = activeUser.id;
+      error.isVerified =
+        activeUser.is_verified === true;
+
+      throw error;
+    }
+
+    throw createActiveEmailError();
+  }
+
+  /*
+   * Check whether an inactive copy already exists
+   * inside the current tenant.
+   */
+  const tenantUser =
+    await findUserInTenantByEmail(
+      tenantId,
+      email
+    );
+
+  if (
+    tenantUser &&
+    tenantUser.is_active === false
+  ) {
+    const error = new Error(
+      "This user already exists in this company and is currently deactivated."
+    );
+
+    error.statusCode = 409;
+    error.code = "USER_DEACTIVATED";
+    error.userId = tenantUser.id;
+    error.isVerified =
+      tenantUser.is_verified === true;
+
+    throw error;
   }
 
   const code = Math.floor(
@@ -495,37 +925,65 @@ async function inviteUser(tenantId, adminId, data) {
     Date.now() + 15 * 60 * 1000
   );
 
-  const email = data.email.trim().toLowerCase();
-  const twofaRequired = data.twofa_required ?? true;
+  const twofaRequired =
+    data.twofa_required ?? true;
 
   try {
-    await db.query(
+    const result = await db.query(
       `INSERT INTO users
        (
          tenant_id,
          email,
          first_name,
          last_name,
-         role,
+         display_name,
+         phone,
+         job_title,
+         department,
          password_hash,
          is_active,
          is_verified,
          verification_code,
          verification_expires,
          twofa_required,
-         created_by
+         created_by,
+         created_at,
+         updated_at
        )
-       VALUES (
-         $1, $2, $3, $4, $5,
-         NULL, true, false,
-         $6, $7, $8, $9
-       )`,
+       VALUES
+       (
+         $1,
+         $2,
+         $3,
+         $4,
+         $5,
+         $6,
+         $7,
+         $8,
+         NULL,
+         true,
+         false,
+         $9,
+         $10,
+         $11,
+         $12,
+         now(),
+         now()
+       )
+       RETURNING *`,
       [
         tenantId,
         email,
-        data.first_name,
-        data.last_name,
-        data.role || "user",
+        data.first_name.trim(),
+        data.last_name.trim(),
+
+        data.display_name?.trim() ||
+        `${data.first_name.trim()} ${data.last_name.trim()}`,
+
+        data.phone?.trim() || null,
+        data.job_title?.trim() || null,
+        data.department?.trim() || null,
+
         code,
         expires,
         twofaRequired,
@@ -533,11 +991,15 @@ async function inviteUser(tenantId, adminId, data) {
       ]
     );
 
-    const activationEmail = buildActivationEmail({
-      firstName: data.first_name,
-      code,
-      twofaRequired
-    });
+    const activationEmail =
+      buildActivationEmail({
+        firstName:
+          data.first_name.trim(),
+
+        code,
+
+        twofaRequired
+      });
 
     await sendEmail({
       to: email,
@@ -546,17 +1008,52 @@ async function inviteUser(tenantId, adminId, data) {
 
     return {
       success: true,
+      user: mapRow(result.rows[0]),
       email,
-      message: "Invitation sent successfully"
+      message:
+        "Invitation sent successfully"
     };
-
   } catch (err) {
+    if (
+      err.code === "23505" &&
+      err.constraint ===
+      "cpmsoft_user_email_key"
+    ) {
+      const conflictingUser =
+        await findActiveUserByEmail(email);
 
-    if (err.code === "23505") {
+      if (conflictingUser) {
+        if (
+          conflictingUser.tenant_id ===
+          tenantId
+        ) {
+          const error = new Error(
+            "A user with this email is already active in this company."
+          );
+
+          error.statusCode = 409;
+          error.code =
+            "USER_ALREADY_EXISTS";
+          error.userId =
+            conflictingUser.id;
+          error.isVerified =
+            conflictingUser.is_verified ===
+            true;
+
+          throw error;
+        }
+
+        throw createActiveEmailError();
+      }
+
       const error = new Error(
-        "A user with this email already exists."
+        "This email address is already associated with an active account."
       );
-      error.statusCode = 400;
+
+      error.statusCode = 409;
+      error.code =
+        "EMAIL_ACTIVE_IN_ANOTHER_TENANT";
+
       throw error;
     }
 
@@ -593,6 +1090,7 @@ async function activateUser(email, code, password) {
             verification_expires
      FROM users
      WHERE LOWER(email) = LOWER($1)
+     AND is_active = true
      LIMIT 1`,
     [emailNormalized]
   );
@@ -670,32 +1168,76 @@ async function activateUser(email, code, password) {
   };
 }
 
-async function reactivateUser(tenantId, userId) {
-
+async function reactivateUser(
+  tenantId,
+  userId
+) {
   const result = await db.query(
     `SELECT *
-       FROM users
-      WHERE tenant_id = $1
-        AND id = $2`,
+     FROM users
+     WHERE tenant_id = $1
+       AND id = $2`,
     [tenantId, userId]
   );
 
   if (!result.rowCount) {
-    throw new Error("User not found.");
+    const error = new Error("User not found.");
+    error.statusCode = 404;
+    error.code = "USER_NOT_FOUND";
+    throw error;
   }
 
   const user = result.rows[0];
 
-  if (user.is_verified) {
+  if (user.is_active) {
+    return {
+      reactivated: false,
+      inviteSent: false,
+      alreadyActive: true
+    };
+  }
 
-    await db.query(
-      `UPDATE users
-          SET is_active = true,
-              deactivated_at = NULL,
-              deactivated_by = NULL
-        WHERE id = $1`,
-      [userId]
+  const activeUser =
+    await findActiveUserByEmail(
+      user.email,
+      user.id
     );
+
+  if (activeUser) {
+    throw createActiveEmailError();
+  }
+
+  if (user.is_verified) {
+    try {
+      await db.query(
+        `UPDATE users
+         SET is_active = true,
+             deactivated_at = NULL,
+             deactivated_by = NULL,
+             updated_at = now()
+         WHERE id = $1
+           AND tenant_id = $2`,
+        [userId, tenantId]
+      );
+    } catch (err) {
+      if (
+        err.code === "23505" &&
+        err.constraint ===
+        "cpmsoft_user_email_key"
+      ) {
+        const conflictingUser =
+          await findActiveUserByEmail(
+            user.email,
+            user.id
+          );
+
+        if (conflictingUser) {
+          throw createActiveEmailError();
+        }
+      }
+
+      throw err;
+    }
 
     return {
       reactivated: true,
@@ -703,7 +1245,6 @@ async function reactivateUser(tenantId, userId) {
     };
   }
 
-  // never activated
   const code = Math.floor(
     100000 + Math.random() * 900000
   ).toString();
@@ -712,23 +1253,51 @@ async function reactivateUser(tenantId, userId) {
     Date.now() + 15 * 60 * 1000
   );
 
-  await db.query(
-    `UPDATE users
-        SET is_active = true,
-            verification_code = $1,
-            verification_expires = $2,
-            deactivated_at = NULL,
-            deactivated_by = NULL
-      WHERE id = $3`,
-    [code, expires, userId]
-  );
+  try {
+    await db.query(
+      `UPDATE users
+       SET is_active = true,
+           verification_code = $1,
+           verification_expires = $2,
+           deactivated_at = NULL,
+           deactivated_by = NULL,
+           updated_at = now()
+       WHERE id = $3
+         AND tenant_id = $4`,
+      [
+        code,
+        expires,
+        userId,
+        tenantId
+      ]
+    );
+  } catch (err) {
+    if (
+      err.code === "23505" &&
+      err.constraint ===
+      "cpmsoft_user_email_key"
+    ) {
+      const conflictingUser =
+        await findActiveUserByEmail(
+          user.email,
+          user.id
+        );
+
+      if (conflictingUser) {
+        throw createActiveEmailError();
+      }
+    }
+
+    throw err;
+  }
 
   await sendEmail({
     to: user.email,
     ...buildActivationEmail({
       firstName: user.first_name,
       code,
-      twofaRequired: user.twofa_required
+      twofaRequired:
+        user.twofa_required === true
     })
   });
 
@@ -739,6 +1308,7 @@ async function reactivateUser(tenantId, userId) {
 }
 
 
+
 module.exports = {
   countUsers,
   getUsers,
@@ -746,6 +1316,7 @@ module.exports = {
   create,
   update,
   softDelete,
+  checkEmailExists,
   resendInvite,
   inviteUser,
   activateUser,

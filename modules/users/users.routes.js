@@ -108,17 +108,26 @@ module.exports = async function (fastify) {
         type: 'object',
         required: ['email'],
         properties: {
-          email: { type: 'string', format: 'email' }
+          email: {
+            type: 'string',
+            format: 'email'
+          },
+          excludeId: {
+            type: 'string',
+            format: 'uuid'
+          }
         }
       }
     }
   }, async (request) => {
-
     const tenantId = request.user.tenantId;
-    const { email } = request.query;
+    const { email, excludeId } = request.query;
 
-    return service.checkEmailExists(tenantId, email);
-
+    return service.checkEmailExists(
+      tenantId,
+      email,
+      excludeId || null
+    );
   });
 
   //RESEND-INVITE
