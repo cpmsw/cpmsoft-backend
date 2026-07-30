@@ -1,5 +1,5 @@
 const verifyToken = require('../../middleware/verifyToken');
-const service = require('./users.service');
+const service = require("cpmsoft-core/users/users.service");
 
 module.exports = async function (fastify) {
 

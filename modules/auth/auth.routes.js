@@ -6,7 +6,7 @@ const verifyToken = require('../../middleware/verifyToken');
 const speakeasy = require("speakeasy");
 const QRCode = require("qrcode");
 const { sendEmail } = require('cpmsoft-core/common/services/emailService');
-const service = require('../users/users.service');
+const usersService = require("cpmsoft-core/users/users.service");
 const accessService = require('../../services/access.service');
 const { buildUserTokenPayload } = require('../../services/auth.service');
 
