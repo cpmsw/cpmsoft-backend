@@ -1,4 +1,4 @@
-const appDb = require('../db/appDb');
+const appDb = require('cpmsoft-core/common/db/appDb');
 const { getTenant } = require('../services/tenant');
 const requireRole = require('../middleware/requireRole');
 

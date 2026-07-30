@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const db = require('../db/authDb'); // 🔥 required
+const db = require('cpmsoft-core/common/db/authDb'); // 🔥 required
 
 module.exports = async function verifyToken(request, reply) {
 

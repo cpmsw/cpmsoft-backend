@@ -1,7 +1,7 @@
 const verifyToken = require("../middleware/verifyToken");
 const speakeasy = require("speakeasy");
 const QRCode = require("qrcode");
-const db = require("../db/authDb");
+const db = require('cpmsoft-core/common/db/authDb');
 
 module.exports = async function (fastify, opts) {
 

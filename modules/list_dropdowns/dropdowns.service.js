@@ -1,5 +1,5 @@
-const db = require('../../db/appDb');
-const crud = require('../../services/baseCrudService');
+const appDb = require('cpmsoft-core/common/db/appDb');
+const crud = require('cpmsoft-core/common/services/baseCrudService');
 
 const TABLE = "list_dropdowns";
 

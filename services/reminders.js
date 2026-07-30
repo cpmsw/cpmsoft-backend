@@ -1,4 +1,4 @@
-const appDb = require('../db/appDb');
+const appDb = require('cpmsoft-core/common/db/appDb');
 
 /**
  * Fetch due reminders safely.

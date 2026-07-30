@@ -1,4 +1,4 @@
-const db = require('../../db/appDb');
+const db = require('cpmsoft-core/common/db/appDb');
 
 // -----------------------------
 // GET USER ROLES

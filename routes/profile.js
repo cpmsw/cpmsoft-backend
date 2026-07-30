@@ -1,4 +1,4 @@
-const db = require('../db/authDb');
+const db = require('cpmsoft-core/common/db/authDb');
 const verifyToken = require('../middleware/verifyToken');
 
 module.exports = async function profileRoutes(fastify) {

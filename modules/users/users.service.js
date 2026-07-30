@@ -1,7 +1,7 @@
 
-const db = require('../../db/authDb');
-const crud = require('../../services/baseCrudService');
-const { sendEmail } = require('../../services/emailService');
+const db = require('cpmsoft-core/common/db/authDb');
+const crud = require('cpmsoft-core/common/services/baseCrudService');
+const { sendEmail } = require('cpmsoft-core/common/services/emailService');
 const bcrypt = require("bcrypt");
 
 

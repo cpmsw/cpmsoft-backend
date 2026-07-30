@@ -1,11 +1,11 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const db = require('../../db/authDb');
-const appDb = require('../../db/appDb');
+const db = require('cpmsoft-core/common/db/authDb');
+const appDb = require('cpmsoft-core/common/db/appDb');
 const verifyToken = require('../../middleware/verifyToken');
 const speakeasy = require("speakeasy");
 const QRCode = require("qrcode");
-const { sendEmail } = require('../../services/emailService');
+const { sendEmail } = require('cpmsoft-core/common/services/emailService');
 const service = require('../users/users.service');
 const accessService = require('../../services/access.service');
 const { buildUserTokenPayload } = require('../../services/auth.service');

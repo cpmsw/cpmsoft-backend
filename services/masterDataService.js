@@ -1,4 +1,4 @@
-const db = require("../db/appDb");
+const appDb = require('cpmsoft-core/common/db/appDb');
 const masterSchemas = require("../schemas/masterSchemas");
 
 async function create(entity, data, tenantId) {

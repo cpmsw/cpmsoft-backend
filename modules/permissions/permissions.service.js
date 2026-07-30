@@ -1,4 +1,4 @@
-const db = require('../../db/appDb');
+const appDb = require('cpmsoft-core/common/db/appDb');
 
 // -----------------------------
 // LIST GROUPED

@@ -1,4 +1,4 @@
-const { sendEmail } = require('../services/emailService');
+const { sendEmail } = require('cpmsoft-core/common/services/emailService');
 const {
   getDueReminders,
   markSent,
