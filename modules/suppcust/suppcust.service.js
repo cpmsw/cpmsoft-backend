@@ -1,4 +1,4 @@
-const appDb = require('cpmsoft-core/common/db/appDb');
+const db = require('cpmsoft-core/common/db/appDb');
 const crud = require('cpmsoft-core/common/services/baseCrudService');
 
 const TABLE = "suppcust";

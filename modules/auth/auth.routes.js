@@ -695,7 +695,7 @@ fastify.post('/activate', async (request, reply) => {
   const { email, code, password } = request.body;
 
   try {
-    const result = await service.activateUser(
+    const result = await usersService.activateUser(
       email,
       code,
       password
