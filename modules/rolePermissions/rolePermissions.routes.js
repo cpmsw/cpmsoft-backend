@@ -1,5 +1,5 @@
 const verifyToken = require('../../middleware/verifyToken');
-const service = require('./rolePermissions.service');
+const service = require("cpmsoft-core/rolePermissions");
 
 module.exports = async function (fastify) {
 
@@ -36,7 +36,7 @@ module.exports = async function (fastify) {
   }, async (request) => {
 
     const tenantId = request.user.tenantId;
-    const userId = request.user.id;
+    const userId = request.user.userId;
     const { id } = request.params;
 
     await service.saveRolePermissions(
