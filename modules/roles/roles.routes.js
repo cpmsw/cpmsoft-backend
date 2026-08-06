@@ -1,5 +1,5 @@
 const verifyToken = require('../../middleware/verifyToken');
-const service = require('./roles.service');
+const service = require("cpmsoft-core/roles")
 const requirePermission = require('../../middleware/requirePermission');
 
 module.exports = async function (fastify) {
