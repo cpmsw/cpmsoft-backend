@@ -53,12 +53,13 @@ module.exports = async function authRoutes(fastify) {
     schema: {
       summary: 'Swagger Test Login',
       tags: ['Auth'],
+      consumes: ['application/x-www-form-urlencoded'], 
       body: {
         type: 'object',
         required: ['email', 'password'],
         properties: {
-          email: { type: 'string' },
-          password: { type: 'string' }
+          email: { type: 'string',format: 'email', examples: [""]},
+          password: { type: 'string',format : 'password', examples: [""]}
         }
       }
     }
@@ -469,7 +470,19 @@ module.exports = async function authRoutes(fastify) {
   // -----------------------------
   // 2FA SETUP FIRST (PUBLIC)
   // -----------------------------
-  fastify.post('/2fa/setup-first', async (request, reply) => {
+  fastify.post('/2fa/setup-first', 
+    
+    {
+    schema: {
+      tags: ['Auth'],
+      body: {
+        type: 'object',
+        properties: {} // Keeps it minimal so Swagger UI displays a request body box
+      }
+    }
+  },
+    
+    async (request, reply) => {
     console.log("SETUP-FIRST BODY:", request.body);
 
     const { userId, email } = request.body || {};

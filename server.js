@@ -1,5 +1,6 @@
 const fastify = require('fastify')({ logger: true });
 
+
 const apiGuard = require('./middleware/apiGuard');
 const rateLimit = require('@fastify/rate-limit');
 
@@ -8,6 +9,9 @@ const swaggerUI = require('@fastify/swagger-ui');
 const cors = require('@fastify/cors');
 const path = require('path');
 const AutoLoad = require('@fastify/autoload');
+
+// Added for Swagger to be used like a form with text boxes
+fastify.register(require('@fastify/formbody'));
 
 // Plugins & hooks
 fastify.register(rateLimit, {
