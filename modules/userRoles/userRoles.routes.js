@@ -1,52 +1,89 @@
-const verifyToken = require('../../middleware/verifyToken');
-const service = require('./userRoles.service');
+const service =
+  require("cpmsoft-core/userRoles");
 
-module.exports = async function (fastify) {
+module.exports =
+async function (fastify) {
 
   // -----------------------------
   // GET USER ROLES
   // -----------------------------
-  fastify.get('/:id/roles', {
-    preHandler: verifyToken
-  }, async (request) => {
-
-    const tenantId = request.user.tenantId;
-    const { id } = request.params;
-
-    return await service.getUserRoles(tenantId, id);
-  });
-
-  // -----------------------------
-  // SAVE USER ROLES
-  // -----------------------------
-  fastify.put('/:id/roles', {
-    preHandler: verifyToken,
+  fastify.get("/:id/roles", {
     schema: {
-      body: {
-        type: 'object',
-        required: ['roleIds'],
+      params: {
+        type: "object",
+        required: ["id"],
         properties: {
-          roleIds: {
-            type: 'array',
-            items: { type: 'string' }
+          id: {
+            type: "string",
+            format: "uuid"
           }
         }
       }
     }
   }, async (request) => {
 
-    const tenantId = request.user.tenantId;
-    const currentUserId = request.user.id;
-    const { id } = request.params;
+    const tenantId =
+      request.user.tenantId;
 
-    await service.saveUserRoles(
+    const { id } =
+      request.params;
+
+    return service.getUserRoles(
+      tenantId,
+      id
+    );
+  });
+
+
+  // -----------------------------
+  // SAVE USER ROLES
+  // -----------------------------
+  fastify.put("/:id/roles", {
+    schema: {
+      params: {
+        type: "object",
+        required: ["id"],
+        properties: {
+          id: {
+            type: "string",
+            format: "uuid"
+          }
+        }
+      },
+
+      body: {
+        type: "object",
+        additionalProperties: false,
+        required: ["roleIds"],
+
+        properties: {
+          roleIds: {
+            type: "array",
+            items: {
+              type: "string",
+              format: "uuid"
+            }
+          }
+        }
+      }
+    }
+  }, async (request) => {
+
+    const tenantId =
+      request.user.tenantId;
+
+    const currentUserId =
+      request.user.userId;
+
+    const { id } =
+      request.params;
+
+    return service.saveUserRoles(
       tenantId,
       currentUserId,
       id,
       request.body.roleIds
     );
-
-    return { success: true };
   });
 
 };
