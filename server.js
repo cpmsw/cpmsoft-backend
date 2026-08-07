@@ -11,7 +11,7 @@ const AutoLoad = require('@fastify/autoload');
 
 // Plugins & hooks
 fastify.register(rateLimit, {
-    global: false
+  global: false
 });
 
 
@@ -23,7 +23,7 @@ fastify.register(cors, {
       'https://www.cpmsoft.com',
       'https://contact.cpmsoft.com',
       'https://api.cpmsoft.app',
-       // ✅ DEV
+      // ✅ DEV
       'http://localhost:5173',
       'http://192.168.1.67:5173',
       'http://127.0.0.1:5173',
@@ -49,42 +49,46 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 
 
-  fastify.register(swagger, {
-    openapi: {
-      info: {
-        title: 'CPMSOFT API',
-        description: 'CPMSOFT backend API',
-        version: '1.0.0'
-      },
-      servers: [
-        { url: 'https://api.cpmsoft.app' }
-      ],
-      components: {
-        securitySchemes: {
-          bearerAuth: {
-            type: 'http',
-            scheme: 'bearer',
-            bearerFormat: 'JWT'
-          }
+fastify.register(swagger, {
+  openapi: {
+    info: {
+      title: 'CPMSOFT API',
+      description: 'CPMSOFT backend API',
+      version: '1.0.0'
+    },
+    servers: [
+      { url: 'https://api.cpmsoft.app' }
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT'
         }
       }
     }
-  });
+  }
+});
 
-  
 
-  fastify.register(swaggerUI, {
-    routePrefix: '/api/docs',
-    uiConfig: {
-      docExpansion: 'list',
-      deepLinking: false
-    },
+
+fastify.register(swaggerUI, {
+  routePrefix: '/api/docs',
+  uiConfig: {
+    docExpansion: 'list',
+    deepLinking: false,
+    // Sorts the main section headers (tags) alphabetically
+    tagsSorter: 'alpha',
+    // Sorts the routes inside each section alphabetically by path
+    operationsSorter: 'alpha'
+  },
   theme: {
     title: 'CPMSOFT API Documentation'
   },
   staticCSP: true,
   transformStaticCSP: (header) => header
-  });
+});
 
 
 
@@ -92,7 +96,7 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 fastify.addHook('onRoute', (routeOptions) => {
   if (routeOptions.url.startsWith('/api/') &&
-      !['/api/auth/login', '/api/auth/activate','/api/ping', '/api/health'].includes(routeOptions.url)) {
+    !['/api/auth/login', '/api/auth/activate', '/api/ping', '/api/health'].includes(routeOptions.url)) {
     routeOptions.schema = routeOptions.schema || {};
     routeOptions.schema.security = [{ bearerAuth: [] }];
   }
@@ -130,7 +134,7 @@ fastify.register(AutoLoad, {
  */
 const start = async () => {
 
-// 🔐 REQUIRED ENV VALIDATION (CORRECT LOCATION)
+  // 🔐 REQUIRED ENV VALIDATION (CORRECT LOCATION)
   const requiredEnv = [
     'JWT_SECRET',
     'SMTP_HOST',
@@ -148,8 +152,8 @@ const start = async () => {
 
   try {
     await fastify.listen({ port: 4000, host: '127.0.0.1' });
-        const { startReminderRunner } = require('./jobs/reminderRunner');
-        startReminderRunner();
+    const { startReminderRunner } = require('./jobs/reminderRunner');
+    startReminderRunner();
 
     fastify.log.info('🚀 Fastify running on http://127.0.0.1:4000');
   } catch (err) {
