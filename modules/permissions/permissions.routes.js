@@ -93,6 +93,32 @@ module.exports =
     });
 
     // ---------------------------------
+    // AVAILABLE FOR LOGGED-IN TENANT
+    // GET /api/permissions/available
+    // ---------------------------------
+    // Keep before "/:id".
+    fastify.get("/available", {
+      preHandler: verifyToken,
+
+      schema: {
+        tags: ["Permissions"],
+
+        summary:
+          "Get permissions available to the tenant",
+
+        description:
+          "Returns only resources currently enabled for the logged-in tenant, together with active permissions available for each resource."
+      }
+
+    }, async (request) => {
+
+      return permissionsService
+        .getAvailablePermissions(
+          request.user.tenantId
+        );
+    });
+
+    // ---------------------------------
     // GET ONE
     // GET /api/permissions/:id
     // ---------------------------------
