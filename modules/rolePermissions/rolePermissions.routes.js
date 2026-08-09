@@ -1,52 +1,213 @@
-const verifyToken = require('../../middleware/verifyToken');
-const service = require("cpmsoft-core/rolePermissions");
+const verifyToken =
+  require("../../middleware/verifyToken");
 
-module.exports = async function (fastify) {
+const service =
+  require("cpmsoft-core/rolePermissions");
 
-  // -----------------------------
-  // GET ROLE PERMISSIONS
-  // -----------------------------
-  fastify.get('/:id/permissions', {
-    preHandler: verifyToken
-  }, async (request) => {
 
-    const tenantId = request.user.tenantId;
-    const { id } = request.params;
+module.exports =
+  async function (fastify) {
 
-    return await service.getRolePermissions(tenantId, id);
-  });
 
-  // -----------------------------
-  // SAVE ROLE PERMISSIONS
-  // -----------------------------
-  fastify.put('/:id/permissions', {
-    preHandler: verifyToken,
-    schema: {
-      body: {
-        type: 'object',
-        required: ['permissionIds'],
-        properties: {
-          permissionIds: {
-            type: 'array',
-            items: { type: 'string' }
+    // ---------------------------------
+    // GET FRIENDLY ROLE ACCESS
+    // ---------------------------------
+    fastify.get(
+      "/:id/access",
+      {
+        preHandler: verifyToken,
+
+        schema: {
+          tags: ["Role Permissions"],
+
+          summary:
+            "Get role access configuration",
+
+          params: {
+            type: "object",
+            required: ["id"],
+
+            properties: {
+              id: {
+                type: "string",
+                format: "uuid"
+              }
+            }
           }
         }
+      },
+
+      async (request) => {
+
+        return service.getRoleAccess(
+          request.user.tenantId,
+          request.params.id
+        );
       }
-    }
-  }, async (request) => {
-
-    const tenantId = request.user.tenantId;
-    const userId = request.user.userId;
-    const { id } = request.params;
-
-    await service.saveRolePermissions(
-      tenantId,
-      userId,
-      id,
-      request.body.permissionIds
     );
 
-    return { success: true };
-  });
 
-};
+    // ---------------------------------
+    // SAVE FRIENDLY ROLE ACCESS
+    // ---------------------------------
+    fastify.put(
+      "/:id/access",
+      {
+        preHandler: verifyToken,
+
+        schema: {
+          tags: ["Role Permissions"],
+
+          summary:
+            "Save role access configuration",
+
+          params: {
+            type: "object",
+            required: ["id"],
+
+            properties: {
+              id: {
+                type: "string",
+                format: "uuid"
+              }
+            }
+          },
+
+          body: {
+            type: "object",
+            additionalProperties: false,
+
+            required: [
+              "resources"
+            ],
+
+            properties: {
+
+              resources: {
+                type: "array",
+
+                items: {
+                  type: "object",
+                  additionalProperties:
+                    false,
+
+                  required: [
+                    "resourceKey",
+                    "access"
+                  ],
+
+                  properties: {
+
+                    resourceKey: {
+                      type: "string"
+                    },
+
+                    access: {
+                      type: "string",
+                      enum: [
+                        "NONE",
+                        "READ",
+                        "READ_WRITE"
+                      ]
+                    },
+
+                    canDelete: {
+                      type: "boolean",
+                      default: false
+                    }
+                  }
+                }
+              },
+
+              specialPermissionIds: {
+                type: "array",
+
+                items: {
+                  type: "string",
+                  format: "uuid"
+                },
+
+                default: []
+              }
+            }
+          }
+        }
+      },
+
+      async (request) => {
+
+        return service.saveRoleAccess(
+          request.user.tenantId,
+          request.user.userId,
+          request.params.id,
+          request.body
+        );
+      }
+    );
+
+
+    // ---------------------------------
+    // GET RAW ROLE PERMISSIONS
+    // ---------------------------------
+    fastify.get(
+      "/:id/permissions",
+      {
+        preHandler: verifyToken
+      },
+
+      async (request) => {
+
+        return service
+          .getRolePermissions(
+            request.user.tenantId,
+            request.params.id
+          );
+      }
+    );
+
+
+    // ---------------------------------
+    // SAVE RAW ROLE PERMISSIONS
+    // ---------------------------------
+    fastify.put(
+      "/:id/permissions",
+      {
+        preHandler: verifyToken,
+
+        schema: {
+          body: {
+            type: "object",
+            required: [
+              "permissionIds"
+            ],
+
+            properties: {
+              permissionIds: {
+                type: "array",
+
+                items: {
+                  type: "string"
+                }
+              }
+            }
+          }
+        }
+      },
+
+      async (request) => {
+
+        await service
+          .saveRolePermissions(
+            request.user.tenantId,
+            request.user.userId,
+            request.params.id,
+            request.body.permissionIds
+          );
+
+        return {
+          success: true
+        };
+      }
+    );
+
+  };
