@@ -11,9 +11,11 @@ node_modules/
 # Environment variables (SECRETS)
 # ==============================
 .env
+*.env
 .env.*
 !.env.example
 ecosystem.config.js
+ecosystem.config.js.backup
 
 # ==============================
 # Logs
