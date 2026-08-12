@@ -1,5 +1,6 @@
-const appDb =
-  require("cpmsoft-core/common/db/appDb");
+const accessService =
+  require("../services/access.service");
+
 
 module.exports =
 function requirePermission(permissionKey) {
@@ -12,7 +13,9 @@ function requirePermission(permissionKey) {
     const tenantId =
       request.user?.tenantId;
 
+
     if (!userId || !tenantId) {
+
       return reply.code(401).send({
         error: "Unauthorized",
         code: "AUTH_CONTEXT_MISSING",
@@ -21,7 +24,9 @@ function requirePermission(permissionKey) {
       });
     }
 
+
     if (!permissionKey) {
+
       return reply.code(500).send({
         error: "Server Error",
         code:
@@ -31,46 +36,40 @@ function requirePermission(permissionKey) {
       });
     }
 
-    const result = await appDb.query(
-      `SELECT EXISTS (
-         SELECT 1
-         FROM user_roles ur
 
-         INNER JOIN roles r
-           ON r.id = ur.role_id
-          AND r.tenant_id = ur.tenant_id
+    try {
 
-         INNER JOIN role_permissions rp
-           ON rp.role_id = ur.role_id
-          AND rp.tenant_id = ur.tenant_id
+      const hasPermission =
+        await accessService.hasPermission(
+          tenantId,
+          userId,
+          permissionKey
+        );
 
-         INNER JOIN permissions p
-           ON p.id = rp.permission_id
 
-         WHERE ur.tenant_id = $1
-           AND ur.user_id = $2
-           AND ur.is_active = true
-           AND r.is_active = true
-           AND p.is_active = true
-           AND p.permission_key = $3
-       ) AS has_permission`,
-      [
-        tenantId,
-        userId,
-        permissionKey
-      ]
-    );
+      if (!hasPermission) {
 
-    const hasPermission =
-      result.rows[0]?.has_permission === true;
+        return reply.code(403).send({
+          error: "Forbidden",
+          code: "PERMISSION_DENIED",
+          message:
+            "You do not have permission to perform this action."
+        });
+      }
 
-    if (!hasPermission) {
-      return reply.code(403).send({
-        error: "Forbidden",
-        code: "PERMISSION_DENIED",
+
+    } catch (error) {
+
+      request.log.error(error);
+
+      return reply.code(500).send({
+        error: "Server Error",
+        code:
+          "PERMISSION_CHECK_FAILED",
         message:
-          "You do not have permission to perform this action."
+          "Unable to verify permission."
       });
     }
+
   };
 };

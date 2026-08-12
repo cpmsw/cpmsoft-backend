@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const db = require('cpmsoft-core/common/db/authDb');
 const appDb = require('cpmsoft-core/common/db/appDb');
 const verifyToken = require('../../middleware/verifyToken');
+const requirePermission = require('../../middleware/requirePermission');
 const speakeasy = require("speakeasy");
 const QRCode = require("qrcode");
 const { sendEmail } = require('cpmsoft-core/common/services/emailService');
@@ -53,13 +54,13 @@ module.exports = async function authRoutes(fastify) {
     schema: {
       summary: 'Swagger Test Login',
       tags: ['Auth'],
-      consumes: ['application/x-www-form-urlencoded'], 
+      consumes: ['application/x-www-form-urlencoded'],
       body: {
         type: 'object',
         required: ['email', 'password'],
         properties: {
-          email: { type: 'string',format: 'email', examples: [""]},
-          password: { type: 'string',format : 'password', examples: [""]}
+          email: { type: 'string', format: 'email', examples: [""] },
+          password: { type: 'string', format: 'password', examples: [""] }
         }
       }
     }
@@ -350,7 +351,10 @@ module.exports = async function authRoutes(fastify) {
   // ADMIN RESET USER PASSWORD
   // -----------------------------
   fastify.post('/admin/users/:id/reset-password', {
-    preHandler: verifyToken,
+    preHandler: [
+      verifyToken,
+      requirePermission("users.edit")
+    ],
     schema: {
       summary: 'Admin reset user password',
       tags: ['Admin'],
@@ -369,10 +373,6 @@ module.exports = async function authRoutes(fastify) {
       }
     }
   }, async (request, reply) => {
-
-    if (request.user.role !== 'admin') {
-      return reply.code(403).send({ error: "Unauthorized" });
-    }
 
     const userId = request.params.id;
     const { newPassword } = request.body;
@@ -470,55 +470,55 @@ module.exports = async function authRoutes(fastify) {
   // -----------------------------
   // 2FA SETUP FIRST (PUBLIC)
   // -----------------------------
-  fastify.post('/2fa/setup-first', 
-    
+  fastify.post('/2fa/setup-first',
+
     {
-    schema: {
-      tags: ['Auth'],
-      body: {
-        type: 'object',
-        properties: {} // Keeps it minimal so Swagger UI displays a request body box
+      schema: {
+        tags: ['Auth'],
+        body: {
+          type: 'object',
+          properties: {} // Keeps it minimal so Swagger UI displays a request body box
+        }
       }
-    }
-  },
-    
+    },
+
     async (request, reply) => {
-    console.log("SETUP-FIRST BODY:", request.body);
+      console.log("SETUP-FIRST BODY:", request.body);
 
-    const { userId, email } = request.body || {};
+      const { userId, email } = request.body || {};
 
-    if (!userId || !email) {
-      return reply.code(400).send({
-        error: "Missing userId/email",
-        received: request.body
+      if (!userId || !email) {
+        return reply.code(400).send({
+          error: "Missing userId/email",
+          received: request.body
+        });
+      }
+      const result = await db.query(
+        `SELECT id FROM users WHERE id = $1`,
+        [userId]
+      );
+
+      if (!result.rows.length) {
+        return reply.code(400).send({ error: "User not found" });
+      }
+
+      const secret = speakeasy.generateSecret({
+        length: 20,
+        name: `CPMSOFT (${email})`
       });
-    }
-    const result = await db.query(
-      `SELECT id FROM users WHERE id = $1`,
-      [userId]
-    );
 
-    if (!result.rows.length) {
-      return reply.code(400).send({ error: "User not found" });
-    }
+      const qrCode = await QRCode.toDataURL(secret.otpauth_url);
 
-    const secret = speakeasy.generateSecret({
-      length: 20,
-      name: `CPMSOFT (${email})`
+      await db.query(
+        `UPDATE users SET twofa_secret = $1 WHERE id = $2`,
+        [secret.base32, userId]
+      );
+
+      return {
+        qrCode,
+        manualCode: secret.base32
+      };
     });
-
-    const qrCode = await QRCode.toDataURL(secret.otpauth_url);
-
-    await db.query(
-      `UPDATE users SET twofa_secret = $1 WHERE id = $2`,
-      [secret.base32, userId]
-    );
-
-    return {
-      qrCode,
-      manualCode: secret.base32
-    };
-  });
 
   // -----------------------------
   // 2FA VERIFY LOGIN
@@ -611,6 +611,49 @@ module.exports = async function authRoutes(fastify) {
   });
 
   // -----------------------------
+  // CURRENT EFFECTIVE ACCESS
+  // -----------------------------
+  fastify.get('/access', {
+    preHandler: verifyToken
+  }, async (request) => {
+
+    const userId =
+      request.user.userId;
+
+    const tenantId =
+      request.user.tenantId;
+
+    const permissions =
+      await accessService.getUserPermissions(
+        tenantId,
+        userId
+      );
+
+    const rolesResult =
+      await appDb.query(
+        `SELECT r.role_code
+       FROM user_roles ur
+       JOIN roles r
+         ON r.id = ur.role_id
+       WHERE ur.tenant_id = $1
+         AND ur.user_id = $2
+         AND ur.is_active = true
+       ORDER BY r.role_code`,
+        [tenantId, userId]
+      );
+
+    return {
+      userId,
+      tenantId,
+      roles:
+        rolesResult.rows.map(
+          row => row.role_code
+        ),
+      permissions
+    };
+  });
+
+  // -----------------------------
   // GET EXISTING 2FA QR
   // -----------------------------
   fastify.post('/2fa/show-existing', async (request, reply) => {
@@ -654,7 +697,10 @@ module.exports = async function authRoutes(fastify) {
   // INVITE USER
   // -----------------------------
   fastify.post('/invite-user', {
-    preHandler: verifyToken,
+    preHandler: [
+      verifyToken,
+      requirePermission("users.create")
+    ],
     schema: {
       body: {
         type: 'object',
@@ -685,7 +731,7 @@ module.exports = async function authRoutes(fastify) {
     const tenantId = request.user.tenantId;
     const adminId = request.user.userId;
 
-    const { email, first_name, last_name, role,twofa_required } = request.body;
+    const { email, first_name, last_name, role, twofa_required } = request.body;
 
     return service.inviteUser(
       tenantId,
@@ -704,34 +750,34 @@ module.exports = async function authRoutes(fastify) {
   // ACTIVATE USER
   // -----------------------------
 
-fastify.post('/activate', async (request, reply) => {
-  const { email, code, password } = request.body;
+  fastify.post('/activate', async (request, reply) => {
+    const { email, code, password } = request.body;
 
-  try {
-    const result = await usersService.activateUser(
-      email,
-      code,
-      password
-    );
+    try {
+      const result = await usersService.activateUser(
+        email,
+        code,
+        password
+      );
 
-    return reply.code(200).send(result);
+      return reply.code(200).send(result);
 
-  } catch (err) {
-    request.log.warn(
-      {
-        activationCode: err.code,
-        email: String(email || "").trim().toLowerCase()
-      },
-      "Account activation failed"
-    );
+    } catch (err) {
+      request.log.warn(
+        {
+          activationCode: err.code,
+          email: String(email || "").trim().toLowerCase()
+        },
+        "Account activation failed"
+      );
 
-    return reply.code(err.statusCode || 400).send({
-      success: false,
-      code: err.code || "ACTIVATION_FAILED",
-      message: err.message || "Activation failed."
-    });
-  }
-});
+      return reply.code(err.statusCode || 400).send({
+        success: false,
+        code: err.code || "ACTIVATION_FAILED",
+        message: err.message || "Activation failed."
+      });
+    }
+  });
 
 
 };

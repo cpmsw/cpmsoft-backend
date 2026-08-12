@@ -4,7 +4,10 @@ const verifyToken =
 const service =
   require("cpmsoft-core/rolePermissions");
 
+const requirePermission =
+  require("../../middleware/requirePermission");
 
+  
 module.exports =
   async function (fastify) {
 
@@ -15,7 +18,10 @@ module.exports =
     fastify.get(
       "/:id/access",
       {
-        preHandler: verifyToken,
+        preHandler: [
+          verifyToken,
+          requirePermission("roles.view")
+        ],
 
         schema: {
           tags: ["Role Permissions"],
@@ -53,7 +59,10 @@ module.exports =
     fastify.put(
       "/:id/access",
       {
-        preHandler: verifyToken,
+        preHandler: [
+          verifyToken,
+          requirePermission("roles.permissions.assign")
+        ],
 
         schema: {
           tags: ["Role Permissions"],
@@ -152,7 +161,10 @@ module.exports =
     fastify.get(
       "/:id/permissions",
       {
-        preHandler: verifyToken
+        preHandler: [
+          verifyToken,
+          requirePermission("roles.view")
+        ]
       },
 
       async (request) => {
@@ -172,7 +184,10 @@ module.exports =
     fastify.put(
       "/:id/permissions",
       {
-        preHandler: verifyToken,
+        preHandler: [
+          verifyToken,
+          requirePermission("roles.permissions.assign")
+        ],
 
         schema: {
           body: {

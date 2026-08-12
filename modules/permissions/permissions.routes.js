@@ -52,6 +52,9 @@ const permissionIdParamsSchema = {
   }
 };
 
+const requirePermission =
+  require("../../middleware/requirePermission");
+
 module.exports =
   async function permissionsRoutes(
     fastify
@@ -98,8 +101,10 @@ module.exports =
     // ---------------------------------
     // Keep before "/:id".
     fastify.get("/available", {
-      preHandler: verifyToken,
-
+      preHandler: [
+        verifyToken,
+        requirePermission("roles.view")
+      ],
       schema: {
         tags: ["Permissions"],
 
