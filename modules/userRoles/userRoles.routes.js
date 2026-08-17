@@ -1,6 +1,9 @@
 const service =
   require("cpmsoft-core/userRoles");
 
+const requirePermission =
+  require("../../middleware/requirePermission");
+
 module.exports =
 async function (fastify) {
 
@@ -8,6 +11,10 @@ async function (fastify) {
   // GET USER ROLES
   // -----------------------------
   fastify.get("/:id/roles", {
+    preHandler: [
+      requirePermission("users.view")
+    ],
+
     schema: {
       params: {
         type: "object",
@@ -39,6 +46,10 @@ async function (fastify) {
   // SAVE USER ROLES
   // -----------------------------
   fastify.put("/:id/roles", {
+    preHandler: [
+      requirePermission("users.edit")
+    ],
+
     schema: {
       params: {
         type: "object",

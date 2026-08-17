@@ -20,7 +20,7 @@ module.exports =
       {
         preHandler: [
           verifyToken,
-          requirePermission("roles.view")
+          requirePermission("roles_permissions.view")
         ],
 
         schema: {
@@ -61,7 +61,7 @@ module.exports =
       {
         preHandler: [
           verifyToken,
-          requirePermission("roles.permissions.assign")
+          requirePermission("roles_permissions.edit")
         ],
 
         schema: {
@@ -120,7 +120,7 @@ module.exports =
                       ]
                     },
 
-                    canDelete: {
+                    canDeactivate: {
                       type: "boolean",
                       default: false
                     }

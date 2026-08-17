@@ -103,7 +103,9 @@ module.exports =
     fastify.get("/available", {
       preHandler: [
         verifyToken,
-        requirePermission("roles.view")
+        requirePermission(
+          "roles_permissions.view"
+        )
       ],
       schema: {
         tags: ["Permissions"],

@@ -56,61 +56,60 @@ async function isPrimaryContact(
 // ---------------------------------
 // GET USER PERMISSIONS
 // ---------------------------------
+// ---------------------------------
+// GET USER PERMISSIONS
+// ---------------------------------
 async function getUserPermissions(
   tenantId,
   userId
 ) {
 
-  const resourceIds =
-    await getEnabledResourceIds(
-      tenantId
+  // Get tenant resources and their stable keys
+  // from authdb.
+  const resourceResult =
+    await authDb.query(
+      `SELECT
+         tr.resource_id,
+         r.resource_key
+       FROM tenant_resources tr
+       JOIN resources r
+         ON r.id = tr.resource_id
+       WHERE tr.tenant_id = $1
+         AND tr.is_enabled = true
+         AND r.is_active = true`,
+      [tenantId]
     );
 
-  const primary =
-    await isPrimaryContact(
-      tenantId,
-      userId
-    );
 
-
-  // ---------------------------------
-  // PRIMARY CONTACT
-  // ---------------------------------
-  if (primary) {
-
-    const result =
-      await appDb.query(
-        `SELECT DISTINCT
-            p.permission_key
-
-         FROM permissions p
-
-         WHERE p.is_active = true
-
-           AND (
-             p.resource_id IS NULL
-             OR
-             p.resource_id =
-               ANY($1::uuid[])
-           )
-
-         ORDER BY p.permission_key`,
-        [resourceIds]
-      );
-
-    return result.rows.map(
-      row => row.permission_key
-    );
+  if (resourceResult.rowCount === 0) {
+    return [];
   }
 
 
-  // ---------------------------------
-  // NORMAL TENANT USER
-  // ---------------------------------
+  const resourceIds =
+    resourceResult.rows.map(
+      row => row.resource_id
+    );
+
+
+  const resourceKeyById =
+    new Map(
+      resourceResult.rows.map(
+        row => [
+          String(row.resource_id),
+          row.resource_key
+        ]
+      )
+    );
+
+
+  // Get permissions through the user's roles.
+  // resource_id now belongs to role_permissions.
   const result =
     await appDb.query(
       `SELECT DISTINCT
-          p.permission_key
+         rp.resource_id,
+         p.permission_key
 
        FROM user_roles ur
 
@@ -130,15 +129,12 @@ async function getUserPermissions(
          AND ur.is_active = true
          AND r.is_active = true
          AND p.is_active = true
-
-         AND (
-           p.resource_id IS NULL
-           OR
-           p.resource_id =
+         AND rp.resource_id =
              ANY($3::uuid[])
-         )
 
-       ORDER BY p.permission_key`,
+       ORDER BY
+         rp.resource_id,
+         p.permission_key`,
       [
         tenantId,
         userId,
@@ -146,11 +142,25 @@ async function getUserPermissions(
       ]
     );
 
-  return result.rows.map(
-    row => row.permission_key
-  );
-}
 
+  return result.rows
+    .map(row => {
+
+      const resourceKey =
+        resourceKeyById.get(
+          String(row.resource_id)
+        );
+
+      if (!resourceKey) {
+        return null;
+      }
+
+      return (
+        `${resourceKey}.${row.permission_key}`
+      );
+    })
+    .filter(Boolean);
+}
 
 // ---------------------------------
 // CHECK ONE PERMISSION

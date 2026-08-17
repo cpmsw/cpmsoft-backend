@@ -11,7 +11,7 @@ module.exports = async function (fastify) {
   // -----------------------------
   fastify.get("/", {
     preHandler: [
-      requirePermission("roles.view")
+      requirePermission("roles_permissions.view")
     ],
     schema: {
       querystring: {
@@ -43,7 +43,7 @@ module.exports = async function (fastify) {
   // -----------------------------
   fastify.get("/:id", {
     preHandler: [
-      requirePermission("roles.view")
+      requirePermission("roles_permissions.view")
     ]
   }, async (request) => {
 
@@ -65,7 +65,7 @@ module.exports = async function (fastify) {
   // -----------------------------
   fastify.post("/", {
     preHandler: [
-      requirePermission("roles.create")
+      requirePermission("roles_permissions.create")
     ],
     schema: {
       body: {
@@ -108,7 +108,7 @@ module.exports = async function (fastify) {
   // -----------------------------
   fastify.put("/:id", {
     preHandler: [
-      requirePermission("roles.edit")
+      requirePermission("roles_permissions.edit")
     ],
     schema: {
       body: {
@@ -151,7 +151,7 @@ module.exports = async function (fastify) {
   // -----------------------------
   fastify.delete("/:id", {
     preHandler: [
-      requirePermission("roles.edit")
+      requirePermission("roles_permissions.deactivate")
     ]
   }, async (request) => {
 

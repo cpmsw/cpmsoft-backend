@@ -297,7 +297,7 @@ module.exports = async function (fastify) {
     {
       preHandler: [
         requirePermission(
-          "users.resend_invite"
+          "users.edit"
         )
       ],
 
