@@ -97,4 +97,98 @@ async function (fastify) {
     );
   });
 
+  // -----------------------------
+  // GET ROLE USERS
+  // -----------------------------
+  fastify.get("/role/:roleId/users", {
+    preHandler: [
+      requirePermission(
+        "roles_permissions.view"
+      )
+    ],
+
+    schema: {
+      params: {
+        type: "object",
+        required: ["roleId"],
+        properties: {
+          roleId: {
+            type: "string",
+            format: "uuid"
+          }
+        }
+      }
+    }
+  }, async (request) => {
+
+    const tenantId =
+      request.user.tenantId;
+
+    const { roleId } =
+      request.params;
+
+    return service.getRoleUsers(
+      tenantId,
+      roleId
+    );
+  });
+
+
+  // -----------------------------
+  // SAVE ROLE USERS
+  // -----------------------------
+  fastify.put("/role/:roleId/users", {
+    preHandler: [
+      requirePermission(
+        "roles_permissions.edit"
+      )
+    ],
+
+    schema: {
+      params: {
+        type: "object",
+        required: ["roleId"],
+        properties: {
+          roleId: {
+            type: "string",
+            format: "uuid"
+          }
+        }
+      },
+
+      body: {
+        type: "object",
+        additionalProperties: false,
+        required: ["userIds"],
+
+        properties: {
+          userIds: {
+            type: "array",
+            items: {
+              type: "string",
+              format: "uuid"
+            }
+          }
+        }
+      }
+    }
+  }, async (request) => {
+
+    const tenantId =
+      request.user.tenantId;
+
+    const currentUserId =
+      request.user.userId;
+
+    const { roleId } =
+      request.params;
+
+    return service.saveRoleUsers(
+      tenantId,
+      currentUserId,
+      roleId,
+      request.body.userIds
+    );
+  });
+
 };
