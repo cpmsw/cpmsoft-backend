@@ -7,6 +7,47 @@ const requirePermission =
 module.exports = async function (fastify) {
 
   // -----------------------------
+  // COUNT
+  // -----------------------------
+  fastify.get("/count", {
+    preHandler: [
+      requirePermission(
+        "roles_permissions.view"
+      )
+    ],
+    schema: {
+      querystring: {
+        type: "object",
+        properties: {
+          status: {
+            type: "string",
+            enum: [
+              "active",
+              "inactive",
+              "all"
+            ]
+          }
+        }
+      }
+    }
+  }, async (request) => {
+
+    const tenantId =
+      request.user.tenantId;
+
+    const status =
+      request.query.status || "active";
+
+    const count =
+      await service.countRoles(
+        tenantId,
+        status
+      );
+
+    return { count };
+  });
+
+  // -----------------------------
   // GET ROLES
   // -----------------------------
   fastify.get("/", {
@@ -184,6 +225,33 @@ module.exports = async function (fastify) {
     return {
       success: true
     };
+  });
+
+  // -----------------------------
+  // RESTORE
+  // -----------------------------
+  fastify.post("/:id/restore", {
+    preHandler: [
+      requirePermission(
+        "roles_permissions.edit"
+      )
+    ]
+  }, async (request) => {
+
+    const tenantId =
+      request.user.tenantId;
+
+    const userId =
+      request.user.userId;
+
+    const { id } =
+      request.params;
+
+    return service.restoreRole(
+      tenantId,
+      userId,
+      id
+    );
   });
 
 };
