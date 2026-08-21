@@ -19,6 +19,14 @@ module.exports = async function (fastify) {
         properties: {
           search: {
             type: "string"
+          },
+          status: {
+            type: "string",
+            enum: [
+              "active",
+              "inactive",
+              "all"
+            ]
           }
         }
       }
@@ -28,12 +36,15 @@ module.exports = async function (fastify) {
     const tenantId =
       request.user.tenantId;
 
-    const { search } =
-      request.query;
+    const {
+      search,
+      status = "active"
+    } = request.query;
 
     return service.getRoles(
       tenantId,
-      search
+      search,
+      status
     );
   });
 
