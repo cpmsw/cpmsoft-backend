@@ -135,30 +135,5 @@ module.exports = async function (fastify) {
     }
   );
 
-  // ===============================
-  // GET DROPDOWN ITEMS
-  // ===============================
-  fastify.get('/dropdown/:type', async (request) => {
-
-    const tenant = getTenant(request);
-    const { type } = request.params;
-
-    const result = await appDb.query(
-      `
-    SELECT id,
-           dropdown_value,
-           dropdown_code,
-           sort_order,
-           flag_delete
-    FROM list_dropdowns
-    WHERE tenant = $1
-      AND dropdown_type = UPPER($2)
-    ORDER BY sort_order
-    `,
-      [tenant, type]
-    );
-
-    return result.rows;
-  });
 
 };

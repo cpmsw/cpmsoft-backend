@@ -128,10 +128,19 @@ fastify.register(AutoLoad, {
 });
 
 // Load all business modules
+// fastify.register(AutoLoad, {
+//   dir: path.join(__dirname, 'modules'),
+//   options: { prefix: '/api' }
+// });
+
+// Load top-level business modules only.
+// Child modules are registered by their parent module's index.js.
 fastify.register(AutoLoad, {
   dir: path.join(__dirname, 'modules'),
-  options: { prefix: '/api' }
+  options: { prefix: '/api' },
+  maxDepth: 1
 });
+
 
 /**
  * Start server
