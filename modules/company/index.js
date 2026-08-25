@@ -10,14 +10,22 @@ module.exports = async function (fastify) {
     }
   );
   fastify.register(
-      require(
-        "./phones"
-      ),
-      {
-        prefix:
-          "/:companyId/phones"
-      }
-    );
-
+    require(
+      "./phones"
+    ),
+    {
+      prefix:
+        "/:companyId/phones"
+    }
+  );
+  fastify.register(
+    require(
+      "./emails"
+    ),
+    {
+      prefix:
+        "/:companyId/emails"
+    }
+  );
 
 };
