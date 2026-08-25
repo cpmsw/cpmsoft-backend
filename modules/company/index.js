@@ -9,5 +9,15 @@ module.exports = async function (fastify) {
         "/:companyId/addresses"
     }
   );
+  fastify.register(
+      require(
+        "./phones"
+      ),
+      {
+        prefix:
+          "/:companyId/phones"
+      }
+    );
+
 
 };
