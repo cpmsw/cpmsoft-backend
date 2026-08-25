@@ -27,5 +27,15 @@ module.exports = async function (fastify) {
         "/:companyId/emails"
     }
   );
+  fastify.register(
+    require(
+      "./notes"
+    ),
+    {
+      prefix:
+        "/:companyId/notes"
+    }
+  );
 
+  
 };
