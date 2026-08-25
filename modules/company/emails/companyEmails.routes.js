@@ -119,9 +119,18 @@ module.exports =
             },
 
             emailAddress: {
-              type: "string"
-            }
+              type: "string",
+              maxLength: 150
+            },
 
+            notes: {
+              type: "string",
+              maxLength: 250
+            },
+
+            isPrimary: {
+              type: "boolean"
+            }
           },
 
           additionalProperties: false
@@ -183,9 +192,18 @@ module.exports =
             },
 
             emailAddress: {
-              type: "string"
-            }
+              type: "string",
+              maxLength: 150
+            },
 
+            notes: {
+              type: "string",
+              maxLength: 250
+            },
+
+            isPrimary: {
+              type: "boolean"
+            }
           },
 
           additionalProperties: false
