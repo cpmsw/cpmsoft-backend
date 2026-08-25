@@ -123,7 +123,17 @@ module.exports =
             },
 
             extension: {
-              type: "string"
+              type: "string",
+              maxLength: 20
+            },
+
+            notes: {
+              type: "string",
+              maxLength: 250
+            },
+
+            isPrimary: {
+              type: "boolean"
             }
 
           },
@@ -191,9 +201,18 @@ module.exports =
             },
 
             extension: {
-              type: "string"
-            }
+              type: "string",
+              maxLength: 20
+            },
 
+            notes: {
+              type: "string",
+              maxLength: 250
+            },
+
+            isPrimary: {
+              type: "boolean"
+            }
           },
 
           additionalProperties: false
