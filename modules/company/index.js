@@ -1,3 +1,6 @@
+const historyRoutes =
+  require("./history");
+
 module.exports = async function (fastify) {
   fastify.register(
     require("./company.routes")
@@ -36,6 +39,12 @@ module.exports = async function (fastify) {
         "/:companyId/notes"
     }
   );
+  await fastify.register(
+    historyRoutes,
+    {
+      prefix:
+        "/:companyId/history"
+    }
+  );
 
-  
 };
