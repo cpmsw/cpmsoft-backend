@@ -50,6 +50,53 @@ module.exports = async function (fastify) {
     };
   });
 
+  // ---------------------------------
+  // HISTORY USER SEARCH
+  // ---------------------------------
+  fastify.get("/history-search", {
+
+    preHandler: [
+      requirePermission("users.view")
+    ],
+
+    schema: {
+
+      querystring: {
+        type: "object",
+
+        required: [
+          "q"
+        ],
+
+        properties: {
+
+          q: {
+            type: "string",
+            minLength: 1,
+            maxLength: 200
+          }
+
+        },
+
+        additionalProperties: false
+      }
+    }
+
+  }, async (request) => {
+
+    const tenantId =
+      request.user.tenantId;
+
+
+    const { q } =
+      request.query;
+
+
+    return service.searchUsersForHistory(
+      tenantId,
+      q
+    );
+  });
 
   // ---------------------------------
   // GET ONE USER

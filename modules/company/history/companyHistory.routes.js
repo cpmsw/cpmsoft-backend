@@ -7,7 +7,7 @@ const authDb =
   require(
     "cpmsoft-core/common/db/authDb"
   );
-  
+
 const requirePermission =
   require(
     "../../../middleware/requirePermission"
@@ -150,7 +150,6 @@ module.exports =
         summary:
           "Get company history",
 
-
         querystring: {
 
           type: "object",
@@ -163,13 +162,26 @@ module.exports =
 
             action: {
               type: "string",
-
               enum: [
                 "CREATE",
                 "UPDATE",
                 "DELETE",
                 "RESTORE"
               ]
+            },
+
+            userSearch: {
+              type: "string",
+              maxLength: 500
+            },
+            dateFrom: {
+              type: "string",
+              format: "date"
+            },
+
+            dateTo: {
+              type: "string",
+              format: "date"
             },
 
             page: {
@@ -187,9 +199,9 @@ module.exports =
 
           },
 
-          additionalProperties:
-            false
+          additionalProperties: false
         }
+
       }
 
 
@@ -207,10 +219,12 @@ module.exports =
         companyId
       } = request.params;
 
-
       const {
         entityType,
         action,
+        userSearch,
+        dateFrom,
+        dateTo,
         page,
         pageSize
       } = request.query;
@@ -224,13 +238,14 @@ module.exports =
           {
             entityType,
             action,
+            userSearch,
+            dateFrom,
+            dateTo,
             page,
             pageSize
           },
           permissions
         );
-
-
       return addUserNames(
         tenantId,
         history
