@@ -155,19 +155,24 @@ module.exports = async function (fastify) {
           p.package_key,
           r.resource_key
 
-        FROM navigation_items n
+          FROM navigation_items n
 
-        JOIN resources r
+        JOIN tenants t
+          ON t.id = $1
+        AND t.is_active = true
+
+        LEFT JOIN resources r
           ON r.id = n.resource_id
          AND r.is_active = true
 
-        JOIN tenant_resources tr
+        LEFT JOIN tenant_resources tr
           ON tr.resource_id = n.resource_id
          AND tr.tenant_id = $1
          AND tr.is_enabled = true
 
         LEFT JOIN packages p
           ON p.id = n.package_id
+         AND p.is_active = true
 
         LEFT JOIN tenant_packages tp
           ON tp.package_id = n.package_id
@@ -175,23 +180,29 @@ module.exports = async function (fastify) {
          AND tp.is_active = true
 
         WHERE n.is_active = true
-
-          AND n.resource_id =
-              ANY($2::uuid[])
-
+        AND (
+            n.resource_id IS NULL
+            OR r.resource_key <> 'roles_permissions'
+            OR t.rbac_enabled = true
+          )
           AND
           (
-            n.package_id IS NULL
+            (
+              n.resource_id IS NOT NULL
+              AND r.id IS NOT NULL
+              AND tr.resource_id IS NOT NULL
+              AND n.resource_id = ANY($2::uuid[])
+            )
 
             OR
 
             (
-              p.id IS NOT NULL
-              AND p.is_active = true
+              n.resource_id IS NULL
+              AND n.package_id IS NOT NULL
+              AND p.id IS NOT NULL
               AND tp.package_id IS NOT NULL
             )
           )
-
         ORDER BY
           CASE n.nav_area
             WHEN 'top' THEN 1
@@ -208,11 +219,7 @@ module.exports = async function (fastify) {
       );
 
 
-    const navigation = {
-      top: [],
-      settings: []
-    };
-
+    const navigation = {};
 
     for (const row of result.rows) {
 
@@ -228,17 +235,19 @@ module.exports = async function (fastify) {
       };
 
 
-      if (row.nav_area === "top") {
-        navigation.top.push(item);
+      if (!navigation[row.nav_area]) {
+        navigation[row.nav_area] = [];
       }
 
-      else if (
-        row.nav_area === "settings"
-      ) {
-        navigation.settings.push(item);
-      }
+      navigation[row.nav_area].push(item);
+    }
+    if (!navigation.top) {
+      navigation.top = [];
     }
 
+    if (!navigation.settings) {
+      navigation.settings = [];
+    }
 
     return navigation;
   }
@@ -279,6 +288,12 @@ module.exports = async function (fastify) {
                 items:
                   navigationItemSchema
               }
+            },
+
+            additionalProperties: {
+              type: "array",
+              items:
+                navigationItemSchema
             }
           }
         }
