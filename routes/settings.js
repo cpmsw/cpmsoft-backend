@@ -117,100 +117,131 @@ module.exports = async function (fastify) {
   // There are no hard-coded menu/resource mappings.
   // =====================================================
 
-  async function getNavigation(
-    tenantId,
-    userId
-  ) {
+async function getNavigation(
+  tenantId,
+  userId
+) {
 
-    const viewResourceIds =
-      await getUserViewResourceIds(
-        tenantId,
-        userId
-      );
-
-
-    if (viewResourceIds.length === 0) {
-      return {
-        top: [],
-        settings: []
-      };
-    }
+  const viewResourceIds =
+    await getUserViewResourceIds(
+      tenantId,
+      userId
+    );
 
 
-    const result =
-      await authDb.query(
-        `
+  // =====================================================
+  // TOP NAVIGATION
+  //
+  // Source:
+  //   tenant_packages
+  //   packages
+  //
+  // Packages are the top-level application navigation.
+  // =====================================================
+
+  const topResult =
+    await authDb.query(
+      `
         SELECT
-          n.nav_key,
-          n.label,
-          n.nav_area,
-          n.target_key,
-          n.item_type,
-          n.option_type,
-          n.display_order,
-
-          n.package_id,
-          n.resource_id,
-
           p.package_key,
-          r.resource_key
+          COALESCE(
+            NULLIF(p.display_name, ''),
+            p.package_name
+          ) AS label,
+          p.display_order
 
-          FROM navigation_items n
+        FROM tenant_packages tp
 
-        JOIN tenants t
-          ON t.id = $1
-        AND t.is_active = true
-
-        LEFT JOIN resources r
-          ON r.id = n.resource_id
-         AND r.is_active = true
-
-        LEFT JOIN tenant_resources tr
-          ON tr.resource_id = n.resource_id
-         AND tr.tenant_id = $1
-         AND tr.is_enabled = true
-
-        LEFT JOIN packages p
-          ON p.id = n.package_id
+        JOIN packages p
+          ON p.id = tp.package_id
          AND p.is_active = true
 
-        LEFT JOIN tenant_packages tp
-          ON tp.package_id = n.package_id
-         AND tp.tenant_id = $1
-         AND tp.is_active = true
+        JOIN tenants t
+          ON t.id = tp.tenant_id
+         AND t.is_active = true
 
-        WHERE n.is_active = true
-        AND (
-            n.resource_id IS NULL
-            OR r.resource_key <> 'roles_permissions'
-            OR t.rbac_enabled = true
-          )
-          AND
-          (
-            (
-              n.resource_id IS NOT NULL
-              AND r.id IS NOT NULL
-              AND tr.resource_id IS NOT NULL
-              AND n.resource_id = ANY($2::uuid[])
-            )
+        WHERE tp.tenant_id = $1
+          AND tp.is_active = true
 
-            OR
-
-            (
-              n.resource_id IS NULL
-              AND n.package_id IS NOT NULL
-              AND p.id IS NOT NULL
-              AND tp.package_id IS NOT NULL
-            )
-          )
         ORDER BY
-          CASE n.nav_area
-            WHEN 'top' THEN 1
-            WHEN 'settings' THEN 2
-            ELSE 3
-          END,
-          n.display_order,
-          n.label
+          p.display_order,
+          p.package_name
+      `,
+      [
+        tenantId
+      ]
+    );
+
+
+  // =====================================================
+  // RESOURCE / SIDEBAR NAVIGATION
+  //
+  // Source:
+  //   tenant_packages
+  //   package_resources
+  //   tenant_resources
+  //   resources
+  //
+  // RBAC:
+  //   Only resources for which the current user has VIEW
+  //   permission are returned.
+  // =====================================================
+
+  let resourceRows = [];
+
+  if (viewResourceIds.length > 0) {
+
+    const resourceResult =
+      await authDb.query(
+        `
+          SELECT
+            p.package_key,
+
+            r.resource_key,
+
+            COALESCE(
+              NULLIF(r.display_name, ''),
+              r.resource_name
+            ) AS label,
+
+            pr.display_order
+
+          FROM tenant_packages tp
+
+          JOIN packages p
+            ON p.id = tp.package_id
+           AND p.is_active = true
+
+          JOIN package_resources pr
+            ON pr.package_id = p.id
+
+          JOIN resources r
+            ON r.id = pr.resource_id
+           AND r.is_active = true
+
+          JOIN tenant_resources tr
+            ON tr.tenant_id = tp.tenant_id
+           AND tr.resource_id = r.id
+           AND tr.is_enabled = true
+
+          JOIN tenants t
+            ON t.id = tp.tenant_id
+           AND t.is_active = true
+
+          WHERE tp.tenant_id = $1
+            AND tp.is_active = true
+
+            AND r.id = ANY($2::uuid[])
+
+            AND (
+              r.resource_key <> 'roles_permissions'
+              OR t.rbac_enabled = true
+            )
+
+          ORDER BY
+            p.display_order,
+            pr.display_order,
+            r.resource_name
         `,
         [
           tenantId,
@@ -218,40 +249,64 @@ module.exports = async function (fastify) {
         ]
       );
 
-
-    const navigation = {};
-
-    for (const row of result.rows) {
-
-      const item = {
-        id: row.target_key,
-        navKey: row.nav_key,
-        label: row.label,
-        type: row.item_type || "page",
-        optionType:
-          row.option_type || null,
-        displayOrder:
-          row.display_order
-      };
-
-
-      if (!navigation[row.nav_area]) {
-        navigation[row.nav_area] = [];
-      }
-
-      navigation[row.nav_area].push(item);
-    }
-    if (!navigation.top) {
-      navigation.top = [];
-    }
-
-    if (!navigation.settings) {
-      navigation.settings = [];
-    }
-
-    return navigation;
+    resourceRows =
+      resourceResult.rows;
   }
 
+
+  // =====================================================
+  // BUILD RESPONSE
+  // =====================================================
+
+  const navigation = {
+    top: []
+  };
+
+
+  // Top-level packages.
+
+  for (const row of topResult.rows) {
+
+    navigation.top.push({
+      id: row.package_key,
+      navKey: row.package_key,
+      label: row.label,
+      type: "page",
+      optionType: null,
+      displayOrder: row.display_order
+    });
+  }
+
+
+  // Resource sidebars grouped by package_key.
+
+  for (const row of resourceRows) {
+
+    if (!navigation[row.package_key]) {
+      navigation[row.package_key] = [];
+    }
+
+    navigation[row.package_key].push({
+      id: row.resource_key,
+      navKey:
+        `${row.package_key}_${row.resource_key}`,
+      label: row.label,
+      type: "page",
+      optionType: null,
+      displayOrder: row.display_order
+    });
+  }
+
+
+  // Compatibility for /settings/menu.
+
+  if (!navigation.settings) {
+    navigation.settings = [];
+  }
+
+
+  return navigation;
+}
 
   // =====================================================
   // GET COMPLETE NAVIGATION
