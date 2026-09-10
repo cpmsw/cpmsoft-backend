@@ -7,7 +7,7 @@ const auditService =
 const authDb =
   require(
     "cpmsoft-core/common/db/authDb"
-  );  
+  );
 
 const requirePermission =
   require("../../middleware/requirePermission");
@@ -113,7 +113,7 @@ async function addUserNames(
         })
       )
   };
-}  
+}
 
 module.exports = async function (fastify) {
 
@@ -129,12 +129,15 @@ module.exports = async function (fastify) {
     const tenantId =
       request.user.tenantId;
 
-    const { search } =
-      request.query;
+    const {
+      search,
+      status
+    } = request.query;
 
     return service.getUsers(
       tenantId,
-      search
+      search,
+      status || "active"
     );
   });
 
@@ -151,9 +154,14 @@ module.exports = async function (fastify) {
     const tenantId =
       request.user.tenantId;
 
+    const {
+      status
+    } = request.query;
+
     const count =
       await service.countUsers(
-        tenantId
+        tenantId,
+        status || "active"
       );
 
     return {
@@ -661,6 +669,7 @@ module.exports = async function (fastify) {
 
       return service.reactivateUser(
         request.user.tenantId,
+        request.user.userId,
         request.params.id
       );
     }
