@@ -7,31 +7,37 @@ const service =
 const requirePermission =
   require("../../middleware/requirePermission");
 
-  
+
 module.exports =
   async function (fastify) {
 
 
     // ---------------------------------
-    // GET FRIENDLY ROLE ACCESS
+    // GET ROLE ACCESS
     // ---------------------------------
     fastify.get(
       "/:id/access",
       {
         preHandler: [
           verifyToken,
-          requirePermission("roles_permissions.view")
+          requirePermission(
+            "roles_permissions.view"
+          )
         ],
 
         schema: {
-          tags: ["Role Permissions"],
+          tags: [
+            "Role Permissions"
+          ],
 
           summary:
             "Get role access configuration",
 
           params: {
             type: "object",
-            required: ["id"],
+            required: [
+              "id"
+            ],
 
             properties: {
               id: {
@@ -54,25 +60,31 @@ module.exports =
 
 
     // ---------------------------------
-    // SAVE FRIENDLY ROLE ACCESS
+    // SAVE ROLE ACCESS
     // ---------------------------------
     fastify.put(
       "/:id/access",
       {
         preHandler: [
           verifyToken,
-          requirePermission("roles_permissions.edit")
+          requirePermission(
+            "roles_permissions.edit"
+          )
         ],
 
         schema: {
-          tags: ["Role Permissions"],
+          tags: [
+            "Role Permissions"
+          ],
 
           summary:
             "Save role access configuration",
 
           params: {
             type: "object",
-            required: ["id"],
+            required: [
+              "id"
+            ],
 
             properties: {
               id: {
@@ -126,17 +138,6 @@ module.exports =
                     }
                   }
                 }
-              },
-
-              specialPermissionIds: {
-                type: "array",
-
-                items: {
-                  type: "string",
-                  format: "uuid"
-                },
-
-                default: []
               }
             }
           }
@@ -151,77 +152,6 @@ module.exports =
           request.params.id,
           request.body
         );
-      }
-    );
-
-
-    // ---------------------------------
-    // GET RAW ROLE PERMISSIONS
-    // ---------------------------------
-    fastify.get(
-      "/:id/permissions",
-      {
-        preHandler: [
-          verifyToken,
-          requirePermission("roles.view")
-        ]
-      },
-
-      async (request) => {
-
-        return service
-          .getRolePermissions(
-            request.user.tenantId,
-            request.params.id
-          );
-      }
-    );
-
-
-    // ---------------------------------
-    // SAVE RAW ROLE PERMISSIONS
-    // ---------------------------------
-    fastify.put(
-      "/:id/permissions",
-      {
-        preHandler: [
-          verifyToken,
-          requirePermission("roles.permissions.assign")
-        ],
-
-        schema: {
-          body: {
-            type: "object",
-            required: [
-              "permissionIds"
-            ],
-
-            properties: {
-              permissionIds: {
-                type: "array",
-
-                items: {
-                  type: "string"
-                }
-              }
-            }
-          }
-        }
-      },
-
-      async (request) => {
-
-        await service
-          .saveRolePermissions(
-            request.user.tenantId,
-            request.user.userId,
-            request.params.id,
-            request.body.permissionIds
-          );
-
-        return {
-          success: true
-        };
       }
     );
 
