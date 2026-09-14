@@ -136,7 +136,7 @@ module.exports =
 
       preHandler: [
         requirePermission(
-          "company.history_view"
+          "company.view"
         )
       ],
 
