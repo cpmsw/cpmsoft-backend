@@ -100,7 +100,14 @@ fastify.register(swaggerUI, {
 
 fastify.addHook('onRoute', (routeOptions) => {
   if (routeOptions.url.startsWith('/api/') &&
-    !['/api/auth/login', '/api/auth/activate', '/api/ping', '/api/health'].includes(routeOptions.url)) {
+    ![
+      '/api/auth/login',
+      '/api/auth/activate',
+      '/api/auth/activation/invitation',
+      '/api/auth/activation/send-code',
+      '/api/ping',
+      '/api/health'
+    ].includes(routeOptions.url)) {
     routeOptions.schema = routeOptions.schema || {};
     routeOptions.schema.security = [{ bearerAuth: [] }];
   }

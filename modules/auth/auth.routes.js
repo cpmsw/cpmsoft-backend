@@ -1103,28 +1103,74 @@ module.exports = async function authRoutes(fastify) {
     }
   );
 
-  // -----------------------------
-  // ACTIVATE USER
-  // -----------------------------
+  // ==================================================
+  // VALIDATE ACTIVATION INVITATION
+  //
+  // Called when the activation page opens:
+  //
+  // https://cpmsoft.app/activate?token=...
+  //
+  // This validates the 30-day invitation.
+  // It does NOT send a verification code.
+  // ==================================================
+
   fastify.post(
-    '/activate',
+    "/activation/invitation",
+    {
+      schema: {
+        tags: ["Auth"],
+        summary:
+          "Validate an activation invitation",
+
+        body: {
+          type: "object",
+          required: [
+            "token"
+          ],
+          properties: {
+            token: {
+              type: "string",
+              description:
+                "Activation invitation token from the activation link"
+            }
+          }
+        },
+
+        response: {
+          200: {
+            type: "object",
+            additionalProperties: true
+          },
+          400: {
+            type: "object",
+            additionalProperties: true
+          },
+          403: {
+            type: "object",
+            additionalProperties: true
+          },
+          409: {
+            type: "object",
+            additionalProperties: true
+          }
+        }
+      }
+    },
     async (request, reply) => {
 
       const {
-        email,
-        code,
-        password
-      } = request.body;
+        token
+      } = request.body || {};
+
 
       try {
 
         const result =
           await usersService
-            .activateUser(
-              email,
-              code,
-              password
+            .validateInvitation(
+              token
             );
+
 
         return reply
           .code(200)
@@ -1132,24 +1178,240 @@ module.exports = async function authRoutes(fastify) {
 
       } catch (err) {
 
-        request.log.warn(
+        request.log.error(
           {
-            activationCode:
-              err.code,
-            email:
-              String(
-                email || ""
-              )
-                .trim()
-                .toLowerCase()
+            err,
+            code: err.code
+          },
+          "Activation invitation validation failed"
+        );
+
+
+        return reply
+          .code(
+            err.statusCode || 400
+          )
+          .send({
+            success: false,
+            code:
+              err.code ||
+              "INVITATION_VALIDATION_FAILED",
+            message:
+              err.message ||
+              "Unable to validate activation invitation."
+          });
+      }
+    }
+  );
+
+
+  // ==================================================
+  // SEND ACTIVATION VERIFICATION CODE
+  //
+  // The 30-day invitation token identifies the User.
+  //
+  // Generates a fresh six-digit code with a
+  // 15-minute expiration and emails it to the
+  // User's current email address.
+  // ==================================================
+
+  fastify.post(
+    "/activation/send-code",
+    {
+      schema: {
+        tags: ["Auth"],
+        summary:
+          "Send activation verification code",
+
+        body: {
+          type: "object",
+          required: [
+            "token"
+          ],
+          properties: {
+            token: {
+              type: "string",
+              description:
+                "Valid activation invitation token"
+            }
+          }
+        },
+
+        response: {
+          200: {
+            type: "object",
+            additionalProperties: true
+          },
+          400: {
+            type: "object",
+            additionalProperties: true
+          },
+          403: {
+            type: "object",
+            additionalProperties: true
+          },
+          409: {
+            type: "object",
+            additionalProperties: true
+          }
+        }
+      }
+    },
+    async (request, reply) => {
+
+      const {
+        token
+      } = request.body || {};
+
+
+      try {
+
+        const result =
+          await usersService
+            .requestActivationCode(
+              token
+            );
+
+
+        return reply
+          .code(200)
+          .send(result);
+
+      } catch (err) {
+
+        request.log.error(
+          {
+            err,
+            code: err.code
+          },
+          "Activation code request failed"
+        );
+
+
+        return reply
+          .code(
+            err.statusCode || 400
+          )
+          .send({
+            success: false,
+            code:
+              err.code ||
+              "ACTIVATION_CODE_FAILED",
+            message:
+              err.message ||
+              "Unable to send activation verification code."
+          });
+      }
+    }
+  );
+
+
+  // ==================================================
+  // COMPLETE ACCOUNT ACTIVATION
+  //
+  // token + verification code + password
+  //
+  // The email address is NOT supplied by the browser.
+  // The invitation token identifies the User.
+  // ==================================================
+
+  fastify.post(
+    "/activate",
+    {
+      schema: {
+        tags: ["Auth"],
+        summary:
+          "Complete account activation",
+
+        body: {
+          type: "object",
+          required: [
+            "token",
+            "code",
+            "password"
+          ],
+          properties: {
+            token: {
+              type: "string",
+              description:
+                "Valid activation invitation token"
+            },
+
+            code: {
+              type: "string",
+              description:
+                "Six-digit activation verification code",
+              pattern: "^[0-9]{6}$"
+            },
+
+            password: {
+              type: "string",
+              format: "password",
+              minLength: 8,
+              description:
+                "New account password"
+            }
+          }
+        },
+
+        response: {
+          200: {
+            type: "object",
+            additionalProperties: true
+          },
+          400: {
+            type: "object",
+            additionalProperties: true
+          },
+          403: {
+            type: "object",
+            additionalProperties: true
+          },
+          409: {
+            type: "object",
+            additionalProperties: true
+          }
+        }
+      }
+    },
+    async (request, reply) => {
+
+      const {
+        token,
+        code,
+        password
+      } = request.body || {};
+
+
+      try {
+
+        const result =
+          await usersService
+            .activateUser(
+              token,
+              code,
+              password
+            );
+
+
+        return reply
+          .code(200)
+          .send(result);
+
+      } catch (err) {
+
+        request.log.error(
+          {
+            err,
+            code: err.code
           },
           "Account activation failed"
         );
 
+
         return reply
           .code(
-            err.statusCode ||
-            400
+            err.statusCode || 400
           )
           .send({
             success: false,
@@ -1158,11 +1420,10 @@ module.exports = async function authRoutes(fastify) {
               "ACTIVATION_FAILED",
             message:
               err.message ||
-              "Activation failed."
+              "Unable to activate account."
           });
       }
     }
   );
-
 
 };
