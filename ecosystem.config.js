@@ -64,6 +64,10 @@ module.exports = {
         SMTP_FROM:
           process.env.SMTP_FROM,
 
+        CPMSOFT_NOTIFICATION_EMAIL:
+          process.env.CPMSOFT_NOTIFICATION_EMAIL,
+
+
         RECAPTCHA_SITE_KEY:
           process.env.RECAPTCHA_SITE_KEY,
 
