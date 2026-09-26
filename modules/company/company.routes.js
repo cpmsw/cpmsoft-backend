@@ -176,15 +176,9 @@ module.exports = async function (fastify) {
       body: {
         type: "object",
         required: [
-          "companyCode",
           "legalName"
         ],
         properties: {
-          companyCode: {
-            type: "string",
-            minLength: 1,
-            maxLength: 30
-          },
           legalName: {
             type: "string",
             minLength: 1,
@@ -263,15 +257,9 @@ module.exports = async function (fastify) {
       body: {
         type: "object",
         required: [
-          "companyCode",
           "legalName"
         ],
         properties: {
-          companyCode: {
-            type: "string",
-            minLength: 1,
-            maxLength: 30
-          },
           legalName: {
             type: "string",
             minLength: 1,
