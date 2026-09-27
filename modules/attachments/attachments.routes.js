@@ -770,11 +770,51 @@ module.exports =
 
 
           // ==================================================
+          // VALIDATION PHASE
+          // Validate every staged file before creating
+          // any permanent attachment.
+          //
+          // If any file fails validation, nothing has
+          // yet been written to permanent storage or DB.
+          // ==================================================
+
+          for (
+            const stagedFile
+            of stagedFiles
+          ) {
+
+            await service
+              .validateAttachmentForCreate(
+                tenantId,
+                parentType,
+                parentId,
+                {
+                  originalFilename:
+                    stagedFile.originalFilename,
+
+                  contentType:
+                    stagedFile.contentType,
+
+                  fileSizeBytes:
+                    stagedFile.fileSizeBytes,
+
+                  headerBuffer:
+                    stagedFile.headerBuffer,
+
+                  validationPath:
+                    stagedFile.tempPath
+                }
+              );
+          }
+
+
+          // ==================================================
           // PHASE 2
-          // The entire multipart request was accepted.
+          // All staged files passed validation.
           //
           // Only now create permanent attachments.
           // ==================================================
+
 
           for (
             const stagedFile
