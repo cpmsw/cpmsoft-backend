@@ -25,6 +25,23 @@ const service =
 const requireAdministrator =
   require("../../middleware/requireAdministrator");
 
+const attachmentMaxFiles =
+  Number(
+    process.env.ATTACHMENT_MAX_FILES_PER_UPLOAD ||
+    20
+  );
+
+const attachmentMaxFileSizeMb =
+  Number(
+    process.env.ATTACHMENT_MAX_FILE_SIZE_MB ||
+    100
+  );
+
+const attachmentMaxFileSizeBytes =
+  attachmentMaxFileSizeMb *
+  1024 *
+  1024;
+
 function toPublicAttachment(attachment) {
   if (!attachment) {
     return null;
@@ -496,6 +513,38 @@ module.exports =
             additionalProperties:
               false
           }
+        },
+
+        config: {
+          swaggerTransform: ({
+            schema
+          }) => {
+
+            return {
+              schema: {
+                ...schema,
+
+                body: {
+                  type: "object",
+
+                  required: [
+                    "files"
+                  ],
+
+                  properties: {
+                    files: {
+                      type: "array",
+
+                      items: {
+                        type: "string",
+                        format: "binary"
+                      }
+                    }
+                  }
+                }
+              }
+            };
+          }
         }
       },
 
@@ -540,19 +589,63 @@ module.exports =
           );
 
 
+        const stagedFiles =
+          [];
+
         const createdAttachments =
           [];
 
 
         try {
 
-          const parts =
-            request.files();
+          let fileCount = 0;
 
+
+          const parts =
+            request.files({
+              limits: {
+                files:
+                  attachmentMaxFiles,
+
+                fileSize:
+                  attachmentMaxFileSizeBytes
+              }
+            });
+
+
+          // ==================================================
+          // PHASE 1
+          // Receive the complete multipart request.
+          //
+          // Nothing is copied to permanent attachment
+          // storage during this phase.
+          // ==================================================
 
           for await (
             const part of parts
           ) {
+
+            fileCount += 1;
+
+
+            if (
+              fileCount >
+              attachmentMaxFiles
+            ) {
+
+              const error =
+                new Error(
+                  `A maximum of ${attachmentMaxFiles} attachment files can be uploaded at one time.`
+                );
+
+              error.statusCode = 413;
+
+              error.code =
+                "ATTACHMENT_TOO_MANY_FILES";
+
+              throw error;
+            }
+
 
             const tempFilename =
               crypto.randomUUID();
@@ -598,13 +691,16 @@ module.exports =
                 tempPath
               );
 
+
             const fileHandle =
               await fsPromises.open(
                 tempPath,
                 "r"
               );
 
+
             let headerBuffer;
+
 
             try {
 
@@ -614,10 +710,12 @@ module.exports =
                   8192
                 );
 
+
               headerBuffer =
                 Buffer.alloc(
                   headerSize
                 );
+
 
               if (headerSize > 0) {
 
@@ -635,55 +733,26 @@ module.exports =
             }
 
 
-            const created =
-              await service.createAttachment(
-                tenantId,
-                parentType,
-                parentId,
-                userId,
-                {
-                  originalFilename:
-                    part.filename,
+            stagedFiles.push({
+              tempPath,
 
-                  contentType:
-                    part.mimetype ||
-                    "application/octet-stream",
+              originalFilename:
+                part.filename,
 
-                  fileSizeBytes:
-                    stats.size,
+              contentType:
+                part.mimetype ||
+                "application/octet-stream",
 
-                  headerBuffer:
-                    headerBuffer,
+              fileSizeBytes:
+                stats.size,
 
-                  validationPath:
-                    tempPath,
-
-                  source:
-                    fs.createReadStream(
-                      tempPath
-                    )
-                }
-              );
-
-
-            createdAttachments.push(
-              created
-            );
-
-
-            // The physical attachment has now
-            // been copied to S3 or Local storage.
-            // Remove this individual temp file
-            // immediately rather than waiting for
-            // the entire request to finish.
-            await fsPromises.unlink(
-              tempPath
-            );
+              headerBuffer
+            });
           }
 
 
           if (
-            createdAttachments.length === 0
+            stagedFiles.length === 0
           ) {
 
             const error =
@@ -700,6 +769,54 @@ module.exports =
           }
 
 
+          // ==================================================
+          // PHASE 2
+          // The entire multipart request was accepted.
+          //
+          // Only now create permanent attachments.
+          // ==================================================
+
+          for (
+            const stagedFile
+            of stagedFiles
+          ) {
+
+            const created =
+              await service.createAttachment(
+                tenantId,
+                parentType,
+                parentId,
+                userId,
+                {
+                  originalFilename:
+                    stagedFile.originalFilename,
+
+                  contentType:
+                    stagedFile.contentType,
+
+                  fileSizeBytes:
+                    stagedFile.fileSizeBytes,
+
+                  headerBuffer:
+                    stagedFile.headerBuffer,
+
+                  validationPath:
+                    stagedFile.tempPath,
+
+                  source:
+                    fs.createReadStream(
+                      stagedFile.tempPath
+                    )
+                }
+              );
+
+
+            createdAttachments.push(
+              created
+            );
+          }
+
+
           return {
             count:
               createdAttachments.length,
@@ -710,11 +827,33 @@ module.exports =
               )
           };
 
+        } catch (error) {
+
+          if (
+            error?.code ===
+            "FST_FILES_LIMIT"
+          ) {
+
+            const limitError =
+              new Error(
+                "Too many attachment files were uploaded."
+              );
+
+            limitError.statusCode = 413;
+
+            limitError.code =
+              "ATTACHMENT_TOO_MANY_FILES";
+
+            throw limitError;
+          }
+
+
+          throw error;
+
         } finally {
 
-          // Always remove temporary files,
-          // including files left behind after
-          // an upload or validation failure.
+          // Always remove all temporary files
+          // after the request succeeds or fails.
           await fsPromises.rm(
             tempDirectory,
             {
