@@ -52,10 +52,34 @@ async function isPrimaryContact(
   );
 }
 
+async function isAdministrator(
+  tenantId,
+  userId
+) {
 
-// ---------------------------------
-// GET USER PERMISSIONS
-// ---------------------------------
+  const result =
+    await appDb.query(
+      `SELECT EXISTS (
+         SELECT 1
+         FROM user_roles ur
+         JOIN roles r
+           ON r.id = ur.role_id
+          AND r.tenant_id = ur.tenant_id
+         WHERE ur.tenant_id = $1
+           AND ur.user_id = $2
+           AND ur.is_active = true
+           AND r.is_active = true
+           AND r.role_code = 'ADMIN'
+       ) AS is_admin`,
+      [
+        tenantId,
+        userId
+      ]
+    );
+
+  return result.rows[0]?.is_admin === true;
+}
+
 // ---------------------------------
 // GET USER PERMISSIONS
 // ---------------------------------
@@ -256,6 +280,7 @@ async function hasPermission(
 module.exports = {
   getEnabledResourceIds,
   isPrimaryContact,
+  isAdministrator,
   getUserPermissions,
   hasPermission
 };

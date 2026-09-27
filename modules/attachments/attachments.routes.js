@@ -22,6 +22,9 @@ const {
 const service =
   require("cpmsoft-core/attachments");
 
+const requireAdministrator =
+  require("../../middleware/requireAdministrator");
+
 function toPublicAttachment(attachment) {
   if (!attachment) {
     return null;
@@ -180,6 +183,9 @@ module.exports =
     fastify.get(
       "/workspace/:parentType/storage-summary",
       {
+        preHandler:
+          requireAdministrator(),
+
         schema: {
           tags: ["Attachments"],
           summary: "Get attachment storage summary for a workspace",
@@ -228,6 +234,8 @@ module.exports =
     fastify.get(
       "/tenant/storage-summary",
       {
+        preHandler:
+          requireAdministrator(),
         schema: {
           tags: ["Attachments"],
           summary: "Get attachment storage summary for the tenant"
