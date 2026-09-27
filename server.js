@@ -7,11 +7,21 @@ const rateLimit = require('@fastify/rate-limit');
 const swagger = require('@fastify/swagger');
 const swaggerUI = require('@fastify/swagger-ui');
 const cors = require('@fastify/cors');
+const multipart = require('@fastify/multipart');
 const path = require('path');
 const AutoLoad = require('@fastify/autoload');
 
+
 // Added for Swagger to be used like a form with text boxes
 fastify.register(require('@fastify/formbody'));
+
+// Multipart file uploads
+fastify.register(multipart, {
+  limits: {
+    files: 20,
+    fileSize: 100 * 1024 * 1024
+  }
+});
 
 // Plugins & hooks
 fastify.register(rateLimit, {

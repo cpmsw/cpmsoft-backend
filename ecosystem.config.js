@@ -72,8 +72,19 @@ module.exports = {
           process.env.RECAPTCHA_SITE_KEY,
 
         RECAPTCHA_SECRET_KEY:
-          process.env.RECAPTCHA_SECRET_KEY
-      }
+          process.env.RECAPTCHA_SECRET_KEY,
+
+        ATTACHMENT_STORAGE_PROVIDER:
+          process.env.ATTACHMENT_STORAGE_PROVIDER,
+
+        ATTACHMENT_S3_BUCKET:
+          process.env.ATTACHMENT_S3_BUCKET,
+
+        ATTACHMENT_S3_REGION:
+          process.env.ATTACHMENT_S3_REGION,
+
+        ATTACHMENT_S3_PREFIX:
+          process.env.ATTACHMENT_S3_PREFIX      }
     }
   ]
 };
