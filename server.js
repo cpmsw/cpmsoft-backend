@@ -15,11 +15,28 @@ const AutoLoad = require('@fastify/autoload');
 // Added for Swagger to be used like a form with text boxes
 fastify.register(require('@fastify/formbody'));
 
+const attachmentMaxFiles =
+  Number(
+    process.env.ATTACHMENT_MAX_FILES_PER_UPLOAD ||
+    20
+  );
+
+const attachmentMaxFileSizeMb =
+  Number(
+    process.env.ATTACHMENT_MAX_FILE_SIZE_MB ||
+    100
+  );
+  
 // Multipart file uploads
 fastify.register(multipart, {
   limits: {
-    files: 20,
-    fileSize: 100 * 1024 * 1024
+    files:
+      attachmentMaxFiles,
+
+    fileSize:
+      attachmentMaxFileSizeMb *
+      1024 *
+      1024
   }
 });
 
