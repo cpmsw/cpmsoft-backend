@@ -731,7 +731,53 @@ module.exports =
 
               await fileHandle.close();
             }
+            const fileHash =
+              await new Promise(
+                (
+                  resolve,
+                  reject
+                ) => {
 
+                  const hash =
+                    crypto.createHash(
+                      "sha256"
+                    );
+
+
+                  const stream =
+                    fs.createReadStream(
+                      tempPath
+                    );
+
+
+                  stream.on(
+                    "data",
+                    (chunk) => {
+                      hash.update(
+                        chunk
+                      );
+                    }
+                  );
+
+
+                  stream.on(
+                    "end",
+                    () => {
+                      resolve(
+                        hash.digest(
+                          "hex"
+                        )
+                      );
+                    }
+                  );
+
+
+                  stream.on(
+                    "error",
+                    reject
+                  );
+                }
+              );
 
             stagedFiles.push({
               tempPath,
@@ -746,7 +792,9 @@ module.exports =
               fileSizeBytes:
                 stats.size,
 
-              headerBuffer
+              headerBuffer,
+
+              fileHash
             });
           }
 
@@ -774,14 +822,46 @@ module.exports =
           // Validate every staged file before creating
           // any permanent attachment.
           //
+          // Also reject duplicate files selected within
+          // this same upload batch.
+          //
           // If any file fails validation, nothing has
           // yet been written to permanent storage or DB.
           // ==================================================
+
+          const batchFileHashes =
+            new Set();
+
 
           for (
             const stagedFile
             of stagedFiles
           ) {
+
+            if (
+              batchFileHashes.has(
+                stagedFile.fileHash
+              )
+            ) {
+
+              const error =
+                new Error(
+                  `The same file was selected more than once: ${stagedFile.originalFilename}`
+                );
+
+              error.statusCode = 409;
+
+              error.code =
+                "ATTACHMENT_DUPLICATE_FILE";
+
+              throw error;
+            }
+
+
+            batchFileHashes.add(
+              stagedFile.fileHash
+            );
+
 
             await service
               .validateAttachmentForCreate(
@@ -802,10 +882,17 @@ module.exports =
                     stagedFile.headerBuffer,
 
                   validationPath:
-                    stagedFile.tempPath
+                    stagedFile.tempPath,
+
+                  fileHash:
+                    stagedFile.fileHash
                 }
               );
           }
+
+          const uploadBatchId =
+            await service
+              .getNextUploadBatchId();
 
 
           // ==================================================
@@ -827,6 +914,7 @@ module.exports =
                 parentType,
                 parentId,
                 userId,
+                uploadBatchId,
                 {
                   originalFilename:
                     stagedFile.originalFilename,
@@ -842,6 +930,9 @@ module.exports =
 
                   validationPath:
                     stagedFile.tempPath,
+
+                  fileHash:
+                    stagedFile.fileHash,
 
                   source:
                     fs.createReadStream(
