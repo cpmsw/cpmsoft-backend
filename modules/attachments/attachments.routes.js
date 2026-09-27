@@ -590,6 +590,42 @@ module.exports =
                 tempPath
               );
 
+            const fileHandle =
+              await fsPromises.open(
+                tempPath,
+                "r"
+              );
+
+            let headerBuffer;
+
+            try {
+
+              const headerSize =
+                Math.min(
+                  stats.size,
+                  8192
+                );
+
+              headerBuffer =
+                Buffer.alloc(
+                  headerSize
+                );
+
+              if (headerSize > 0) {
+
+                await fileHandle.read(
+                  headerBuffer,
+                  0,
+                  headerSize,
+                  0
+                );
+              }
+
+            } finally {
+
+              await fileHandle.close();
+            }
+
 
             const created =
               await service.createAttachment(
@@ -607,6 +643,9 @@ module.exports =
 
                   fileSizeBytes:
                     stats.size,
+
+                  headerBuffer:
+                    headerBuffer,
 
                   source:
                     fs.createReadStream(
