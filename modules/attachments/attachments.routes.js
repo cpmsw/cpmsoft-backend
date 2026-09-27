@@ -246,7 +246,7 @@ module.exports =
           );
       }
     );
-    
+
     // ---------------------------------
     // OPEN / DOWNLOAD ATTACHMENT
     // ---------------------------------
@@ -651,9 +651,13 @@ module.exports =
 
 
           return {
-            count: attachments.length,
+            count:
+              createdAttachments.length,
+
             attachments:
-              attachments.map(toPublicAttachment)
+              createdAttachments.map(
+                toPublicAttachment
+              )
           };
 
         } finally {
