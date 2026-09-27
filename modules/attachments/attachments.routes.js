@@ -647,6 +647,9 @@ module.exports =
                   headerBuffer:
                     headerBuffer,
 
+                  validationPath:
+                    tempPath,
+
                   source:
                     fs.createReadStream(
                       tempPath
