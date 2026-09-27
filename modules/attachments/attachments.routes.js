@@ -118,6 +118,136 @@ module.exports =
     );
 
     // ---------------------------------
+    // GET PARENT STORAGE SUMMARY
+    // ---------------------------------
+
+    fastify.get(
+      "/:parentType/:parentId/storage-summary",
+      {
+        schema: {
+          tags: ["Attachments"],
+          summary: "Get attachment storage summary for a record",
+
+          params: {
+            type: "object",
+            required: [
+              "parentType",
+              "parentId"
+            ],
+            properties: {
+              parentType: {
+                type: "string",
+                enum: [
+                  "user",
+                  "project",
+                  "company"
+                ]
+              },
+
+              parentId: {
+                type: "string",
+                format: "uuid"
+              }
+            }
+          }
+        }
+      },
+
+      async function (request) {
+
+        const tenantId =
+          request.user.tenantId;
+
+        const {
+          parentType,
+          parentId
+        } = request.params;
+
+
+        return service
+          .getParentStorageSummary(
+            tenantId,
+            parentType,
+            parentId
+          );
+      }
+    );
+
+    // ---------------------------------
+    // GET WORKSPACE STORAGE SUMMARY
+    // ---------------------------------
+
+    fastify.get(
+      "/workspace/:parentType/storage-summary",
+      {
+        schema: {
+          tags: ["Attachments"],
+          summary: "Get attachment storage summary for a workspace",
+
+          params: {
+            type: "object",
+            required: [
+              "parentType"
+            ],
+            properties: {
+              parentType: {
+                type: "string",
+                enum: [
+                  "user",
+                  "project",
+                  "company"
+                ]
+              }
+            }
+          }
+        }
+      },
+
+      async function (request) {
+
+        const tenantId =
+          request.user.tenantId;
+
+        const {
+          parentType
+        } = request.params;
+
+
+        return service
+          .getWorkspaceStorageSummary(
+            tenantId,
+            parentType
+          );
+      }
+    );
+
+    // ---------------------------------
+    // GET TENANT STORAGE SUMMARY
+    // ---------------------------------
+
+    fastify.get(
+      "/tenant/storage-summary",
+      {
+        schema: {
+          tags: ["Attachments"],
+          summary: "Get attachment storage summary for the tenant"
+        }
+      },
+
+      async function (request) {
+
+        const tenantId =
+          request.user.tenantId;
+
+
+        return service
+          .getTenantStorageSummary(
+            tenantId
+          );
+      }
+    );
+    
+    // ---------------------------------
     // OPEN / DOWNLOAD ATTACHMENT
     // ---------------------------------
 
