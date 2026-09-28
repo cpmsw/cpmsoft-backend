@@ -51,6 +51,7 @@ function toPublicAttachment(attachment) {
     id: attachment.id,
     parent_type: attachment.parent_type,
     parent_id: attachment.parent_id,
+    folder_id: attachment.folder_id,
     category: attachment.category,
     original_filename: attachment.original_filename,
     content_type: attachment.content_type,
@@ -532,6 +533,12 @@ module.exports =
                   ],
 
                   properties: {
+
+                    folderId: {
+                      type: "string",
+                      format: "uuid"
+                    },
+
                     files: {
                       type: "array",
 
@@ -594,7 +601,8 @@ module.exports =
 
         const createdAttachments =
           [];
-
+        let folderId =
+          null;
 
         try {
 
@@ -602,7 +610,7 @@ module.exports =
 
 
           const parts =
-            request.files({
+             request.parts({
               limits: {
                 files:
                   attachmentMaxFiles,
@@ -624,7 +632,18 @@ module.exports =
           for await (
             const part of parts
           ) {
+            if (part.type === "field") {
 
+              if (part.fieldname === "folderId") {
+
+                folderId =
+                  String(
+                    part.value || ""
+                  ).trim() || null;
+              }
+
+              continue;
+            }
             fileCount += 1;
 
 
@@ -890,10 +909,6 @@ module.exports =
               );
           }
 
-          const uploadBatchId =
-            await service
-              .getNextUploadBatchId();
-
 
           // ==================================================
           // PHASE 2
@@ -914,7 +929,7 @@ module.exports =
                 parentType,
                 parentId,
                 userId,
-                uploadBatchId,
+                folderId,
                 {
                   originalFilename:
                     stagedFile.originalFilename,
