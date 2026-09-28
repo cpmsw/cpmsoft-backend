@@ -22,6 +22,11 @@ const {
 const service =
   require("cpmsoft-core/attachments");
 
+const folderService =
+  require(
+    "cpmsoft-core/attachments/attachmentFolders.service"
+  );
+
 const requireAdministrator =
   require("../../middleware/requireAdministrator");
 
@@ -610,7 +615,7 @@ module.exports =
 
 
           const parts =
-             request.parts({
+            request.parts({
               limits: {
                 files:
                   attachmentMaxFiles,
@@ -1008,6 +1013,438 @@ module.exports =
             }
           );
         }
+      }
+    );
+
+    // ==================================================
+    // ATTACHMENT FOLDERS
+    // ==================================================
+
+
+    // ---------------------------------
+    // GET FOLDERS FOR PARENT
+    // ---------------------------------
+
+    fastify.get(
+      "/:parentType/:parentId/folders",
+      {
+        schema: {
+          tags: ["Attachments"],
+
+          summary:
+            "Get attachment folders for a parent record",
+
+          params: {
+            type: "object",
+
+            required: [
+              "parentType",
+              "parentId"
+            ],
+
+            properties: {
+
+              parentType: {
+                type: "string",
+
+                enum: [
+                  "user",
+                  "project",
+                  "company"
+                ]
+              },
+
+              parentId: {
+                type: "string",
+                format: "uuid"
+              }
+            },
+
+            additionalProperties:
+              false
+          }
+        }
+      },
+
+      async function (request) {
+
+        const tenantId =
+          request.user.tenantId;
+
+        const {
+          parentType,
+          parentId
+        } = request.params;
+
+
+        return folderService.getFolders(
+          tenantId,
+          parentType,
+          parentId
+        );
+      }
+    );
+
+
+    // ---------------------------------
+    // GET FOLDER
+    // ---------------------------------
+
+    fastify.get(
+      "/:parentType/:parentId/folders/:folderId",
+      {
+        schema: {
+          tags: ["Attachments"],
+
+          summary:
+            "Get an attachment folder",
+
+          params: {
+            type: "object",
+
+            required: [
+              "parentType",
+              "parentId",
+              "folderId"
+            ],
+
+            properties: {
+
+              parentType: {
+                type: "string",
+
+                enum: [
+                  "user",
+                  "project",
+                  "company"
+                ]
+              },
+
+              parentId: {
+                type: "string",
+                format: "uuid"
+              },
+
+              folderId: {
+                type: "string",
+                format: "uuid"
+              }
+            },
+
+            additionalProperties:
+              false
+          }
+        }
+      },
+
+      async function (request) {
+
+        const tenantId =
+          request.user.tenantId;
+
+        const {
+          parentType,
+          parentId,
+          folderId
+        } = request.params;
+
+
+        return folderService.getFolder(
+          tenantId,
+          parentType,
+          parentId,
+          folderId
+        );
+      }
+    );
+
+
+    // ---------------------------------
+    // CREATE FOLDER
+    // ---------------------------------
+
+    fastify.post(
+      "/:parentType/:parentId/folders",
+      {
+        schema: {
+          tags: ["Attachments"],
+
+          summary:
+            "Create an attachment folder",
+
+          params: {
+            type: "object",
+
+            required: [
+              "parentType",
+              "parentId"
+            ],
+
+            properties: {
+
+              parentType: {
+                type: "string",
+
+                enum: [
+                  "user",
+                  "project",
+                  "company"
+                ]
+              },
+
+              parentId: {
+                type: "string",
+                format: "uuid"
+              }
+            },
+
+            additionalProperties:
+              false
+          },
+
+          body: {
+            type: "object",
+
+            required: [
+              "folderName"
+            ],
+
+            properties: {
+
+              folderName: {
+                type: "string",
+                minLength: 1,
+                maxLength: 255
+              },
+
+              description: {
+                type: [
+                  "string",
+                  "null"
+                ],
+                maxLength: 500
+              },
+
+              displayOrder: {
+                type: "integer"
+              }
+            },
+
+            additionalProperties:
+              false
+          }
+        }
+      },
+
+      async function (request) {
+
+        const tenantId =
+          request.user.tenantId;
+
+        const userId =
+          request.user.userId;
+
+        const {
+          parentType,
+          parentId
+        } = request.params;
+
+
+        return folderService.createFolder(
+          tenantId,
+          parentType,
+          parentId,
+          userId,
+          request.body
+        );
+      }
+    );
+
+
+    // ---------------------------------
+    // UPDATE FOLDER
+    // ---------------------------------
+
+    fastify.put(
+      "/:parentType/:parentId/folders/:folderId",
+      {
+        schema: {
+          tags: ["Attachments"],
+
+          summary:
+            "Update an attachment folder",
+
+          params: {
+            type: "object",
+
+            required: [
+              "parentType",
+              "parentId",
+              "folderId"
+            ],
+
+            properties: {
+
+              parentType: {
+                type: "string",
+
+                enum: [
+                  "user",
+                  "project",
+                  "company"
+                ]
+              },
+
+              parentId: {
+                type: "string",
+                format: "uuid"
+              },
+
+              folderId: {
+                type: "string",
+                format: "uuid"
+              }
+            },
+
+            additionalProperties:
+              false
+          },
+
+          body: {
+            type: "object",
+
+            required: [
+              "folderName"
+            ],
+
+            properties: {
+
+              folderName: {
+                type: "string",
+                minLength: 1,
+                maxLength: 255
+              },
+
+              description: {
+                type: [
+                  "string",
+                  "null"
+                ],
+                maxLength: 500
+              },
+
+              displayOrder: {
+                type: "integer"
+              }
+            },
+
+            additionalProperties:
+              false
+          }
+        }
+      },
+
+      async function (request) {
+
+        const tenantId =
+          request.user.tenantId;
+
+        const userId =
+          request.user.userId;
+
+        const {
+          parentType,
+          parentId,
+          folderId
+        } = request.params;
+
+
+        return folderService.updateFolder(
+          tenantId,
+          parentType,
+          parentId,
+          folderId,
+          userId,
+          request.body
+        );
+      }
+    );
+
+
+    // ---------------------------------
+    // DELETE EMPTY FOLDER
+    // ---------------------------------
+
+    fastify.delete(
+      "/:parentType/:parentId/folders/:folderId",
+      {
+        schema: {
+          tags: ["Attachments"],
+
+          summary:
+            "Delete an empty attachment folder",
+
+          params: {
+            type: "object",
+
+            required: [
+              "parentType",
+              "parentId",
+              "folderId"
+            ],
+
+            properties: {
+
+              parentType: {
+                type: "string",
+
+                enum: [
+                  "user",
+                  "project",
+                  "company"
+                ]
+              },
+
+              parentId: {
+                type: "string",
+                format: "uuid"
+              },
+
+              folderId: {
+                type: "string",
+                format: "uuid"
+              }
+            },
+
+            additionalProperties:
+              false
+          }
+        }
+      },
+
+      async function (request) {
+
+        const tenantId =
+          request.user.tenantId;
+
+        const {
+          parentType,
+          parentId,
+          folderId
+        } = request.params;
+
+
+        const userId =
+          request.user.userId;
+
+
+        return folderService.deleteFolder(
+          tenantId,
+          parentType,
+          parentId,
+          folderId,
+          userId
+        );
       }
     );
 
