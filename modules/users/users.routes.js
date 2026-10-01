@@ -33,6 +33,43 @@ module.exports = async function (fastify) {
 
 
   // ---------------------------------
+  // GET ADMINISTRATORS
+  // ---------------------------------
+  fastify.get("/adminlist", {
+    preHandler: [
+      requirePermission("users.view")
+    ],
+
+    schema: {
+      querystring: {
+        type: "object",
+
+        properties: {
+          includePrimary: {
+            type: "boolean",
+            default: true
+          }
+        },
+
+        additionalProperties: false
+      }
+    }
+
+  }, async (request) => {
+
+    const tenantId =
+      request.user.tenantId;
+
+    const includePrimary =
+      request.query.includePrimary !== false;
+
+    return service.getAdminList(
+      tenantId,
+      includePrimary
+    );
+  });
+
+  // ---------------------------------
   // COUNT USERS
   // ---------------------------------
   fastify.get("/count", {
