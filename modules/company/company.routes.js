@@ -21,6 +21,9 @@ module.exports = async function (fastify) {
       querystring: {
         type: "object",
         properties: {
+          search: {
+            type: "string"
+          },
           status: {
             type: "string",
             enum: [
@@ -37,12 +40,15 @@ module.exports = async function (fastify) {
     const tenantId =
       request.user.tenantId;
 
-    const status =
-      request.query.status || "active";
+    const {
+      search = "",
+      status = "active"
+    } = request.query;
 
     const count =
       await service.countCompanies(
         tenantId,
+        search,
         status
       );
 
@@ -99,6 +105,17 @@ module.exports = async function (fastify) {
               "inactive",
               "all"
             ]
+          },
+          page: {
+            type: "integer",
+            minimum: 1,
+            default: 1
+          },
+          pageSize: {
+            type: "integer",
+            minimum: 1,
+            maximum: 100,
+            default: 100
           }
         }
       }
@@ -110,13 +127,17 @@ module.exports = async function (fastify) {
 
     const {
       search,
-      status = "active"
+      status = "active",
+      page = 1,
+      pageSize = 100
     } = request.query;
 
     return service.getCompanies(
       tenantId,
       search,
-      status
+      status,
+      page,
+      pageSize
     );
   });
 
