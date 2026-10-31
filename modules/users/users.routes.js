@@ -13,24 +13,66 @@ module.exports = async function (fastify) {
   fastify.get("/", {
     preHandler: [
       requirePermission("users.view")
-    ]
+    ],
+
+    schema: {
+      querystring: {
+        type: "object",
+
+        properties: {
+          search: {
+            type: "string",
+            default: ""
+          },
+
+          status: {
+            type: "string",
+            enum: [
+              "active",
+              "inactive",
+              "all"
+            ],
+            default: "active"
+          },
+
+          page: {
+            type: "integer",
+            minimum: 1,
+            default: 1
+          },
+
+          pageSize: {
+            type: "integer",
+            minimum: 1,
+            maximum: 100,
+            default: 100
+          }
+        },
+
+        additionalProperties: false
+      }
+    }
+
   }, async (request) => {
 
     const tenantId =
       request.user.tenantId;
 
     const {
-      search,
-      status
+      search = "",
+      status = "active",
+      page = 1,
+      pageSize = 100
     } = request.query;
 
     return service.getUsers(
       tenantId,
       search,
-      status || "active"
+      status,
+      page,
+      pageSize
     );
   });
-
 
   // ---------------------------------
   // GET ADMINISTRATORS
@@ -75,26 +117,55 @@ module.exports = async function (fastify) {
   fastify.get("/count", {
     preHandler: [
       requirePermission("users.view")
-    ]
+    ],
+
+    schema: {
+      querystring: {
+        type: "object",
+
+        properties: {
+          search: {
+            type: "string",
+            default: ""
+          },
+
+          status: {
+            type: "string",
+            enum: [
+              "active",
+              "inactive",
+              "all"
+            ],
+            default: "active"
+          }
+        },
+
+        additionalProperties: false
+      }
+    }
+
   }, async (request) => {
 
     const tenantId =
       request.user.tenantId;
 
     const {
-      status
+      search = "",
+      status = "active"
     } = request.query;
 
     const count =
       await service.countUsers(
         tenantId,
-        status || "active"
+        search,
+        status
       );
 
     return {
       count
     };
   });
+
 
   // ---------------------------------
   // HISTORY USER SEARCH
