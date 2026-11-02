@@ -147,8 +147,6 @@ fastify.addHook('onRoute', (routeOptions) => {
 // fastify.register(require('./routes/security2fa'), { prefix: '/api/security' });
 // fastify.register(require('./routes/profile'), { prefix: '/api/profile' });
 // fastify.register(require('./routes/ping'), { prefix: '/api' });
-// fastify.register(require('./modules/projects/projects.routes'), { prefix: '/api/projects' });
-// fastify.register(require('./modules/projects/projectLines.routes'), { prefix: '/api/projects' });
 // fastify.register(require('./routes/settings'), { prefix: '/api/settings' });
 // fastify.register(require('./modules/customers/customers.routes'), { prefix: '/api/customers'});
 // fastify.register(require('./routes/health'), { prefix: '/api' });
