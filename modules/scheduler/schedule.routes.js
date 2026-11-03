@@ -149,7 +149,8 @@ module.exports = async function (fastify) {
         required: [
           "scheduleName",
           "scheduleStart",
-          "defaultCalendarId"
+          "defaultCalendarId",
+          "timeZone"
         ],
         properties: {
           scheduleNumber: {
@@ -199,6 +200,11 @@ module.exports = async function (fastify) {
           defaultCalendarId: {
             type: "string",
             format: "uuid"
+          },
+          timeZone: {
+            type: "string",
+            minLength: 1,
+            maxLength: 100
           }
         },
         additionalProperties: false
@@ -251,7 +257,8 @@ module.exports = async function (fastify) {
         required: [
           "scheduleName",
           "scheduleStart",
-          "defaultCalendarId"
+          "defaultCalendarId",
+          "timeZone"
         ],
         properties: {
           scheduleName: {
@@ -297,6 +304,11 @@ module.exports = async function (fastify) {
           defaultCalendarId: {
             type: "string",
             format: "uuid"
+          },
+          timeZone: {
+            type: "string",
+            minLength: 1,
+            maxLength: 100
           }
         },
         additionalProperties: false
