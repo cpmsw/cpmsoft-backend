@@ -17,4 +17,12 @@ module.exports = async function (fastify) {
     }
   );
 
+
+  fastify.register(
+    require("./activity.routes"),
+    {
+      prefix: "/schedules"
+    }
+  );
+
 };
