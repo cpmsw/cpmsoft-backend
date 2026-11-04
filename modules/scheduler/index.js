@@ -29,4 +29,15 @@ module.exports = async function (fastify) {
       prefix: "/schedules"
     }
   );
+
+  // ==================================================
+  // SCHEDULER HISTORY
+  // ==================================================
+
+  fastify.register(
+    require("./schedulerHistory.routes"),
+    {
+      prefix: "/schedules"
+    }
+  );
 };
