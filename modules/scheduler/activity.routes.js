@@ -10,6 +10,56 @@ const requirePermission =
   require("../../middleware/requirePermission");
 
 
+const activityChangeSchema = {
+  type: "object",
+  required: ["activityName"],
+  properties: {
+    parentId: {
+      anyOf: [
+        { type: "string", format: "uuid" },
+        { type: "null" }
+      ]
+    },
+    activityCode: {
+      type: ["string", "null"],
+      maxLength: 50
+    },
+    activityName: {
+      type: "string",
+      minLength: 1,
+      maxLength: 200
+    },
+    description: {
+      type: ["string", "null"]
+    },
+    itemType: {
+      type: "string",
+      enum: ["TASK", "MILESTONE"],
+      default: "TASK"
+    },
+    durationMinutes: {
+      type: "integer",
+      minimum: 0,
+      default: 0
+    },
+    percentComplete: {
+      type: "number",
+      minimum: 0,
+      maximum: 100,
+      default: 0
+    },
+    calendarId: {
+      anyOf: [
+        { type: "string", format: "uuid" },
+        { type: "null" }
+      ]
+    }
+  },
+  additionalProperties: false
+};
+
+
+
 module.exports = async function (fastify) {
 
   // ==================================================
@@ -360,6 +410,122 @@ module.exports = async function (fastify) {
         scheduleId,
         activityId,
         request.body
+      );
+    }
+  );
+
+
+  // ==================================================
+  // PREVIEW ACTIVITY CPM CHANGES
+  // ==================================================
+
+  fastify.post(
+    "/:scheduleId/activities/:activityId/preview",
+    {
+      preHandler: [
+        requirePermission("projects.edit")
+      ],
+      schema: {
+        tags: ["Scheduler Activities"],
+        summary: "Preview activity CPM changes without saving",
+        params: {
+          type: "object",
+          required: ["scheduleId", "activityId"],
+          properties: {
+            scheduleId: {
+              type: "string",
+              format: "uuid"
+            },
+            activityId: {
+              type: "string",
+              format: "uuid"
+            }
+          }
+        },
+        body: activityChangeSchema
+      }
+    },
+    async (request) => {
+      const tenantId = request.user.tenantId;
+      const userId = request.user.userId;
+
+      const {
+        scheduleId,
+        activityId
+      } = request.params;
+
+      return scheduler.cpmChangePreview.previewActivityUpdate(
+        tenantId,
+        userId,
+        scheduleId,
+        activityId,
+        request.body
+      );
+    }
+  );
+
+  // ==================================================
+  // APPLY ACTIVITY CPM CHANGES
+  // ==================================================
+
+  fastify.post(
+    "/:scheduleId/activities/:activityId/apply",
+    {
+      preHandler: [
+        requirePermission("projects.edit")
+      ],
+      schema: {
+        tags: ["Scheduler Activities"],
+        summary: "Apply activity CPM changes with revision validation",
+        params: {
+          type: "object",
+          required: ["scheduleId", "activityId"],
+          properties: {
+            scheduleId: {
+              type: "string",
+              format: "uuid"
+            },
+            activityId: {
+              type: "string",
+              format: "uuid"
+            }
+          }
+        },
+        body: {
+          type: "object",
+          required: ["expectedRevision", "changes"],
+          properties: {
+            expectedRevision: {
+              type: "string",
+              pattern: "^[0-9]+$"
+            },
+            changes: activityChangeSchema
+          },
+          additionalProperties: false
+        }
+      }
+    },
+    async (request) => {
+      const tenantId = request.user.tenantId;
+      const userId = request.user.userId;
+
+      const {
+        scheduleId,
+        activityId
+      } = request.params;
+
+      const {
+        expectedRevision,
+        changes
+      } = request.body;
+
+      return scheduler.cpmChangePreview.applyActivityUpdate(
+        tenantId,
+        userId,
+        scheduleId,
+        activityId,
+        changes,
+        expectedRevision
       );
     }
   );
