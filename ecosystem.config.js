@@ -89,8 +89,13 @@ module.exports = {
         ATTACHMENT_MAX_FILES_PER_UPLOAD:
           process.env.ATTACHMENT_MAX_FILES_PER_UPLOAD,
 
+
         ATTACHMENT_MAX_FILE_SIZE_MB:
-          process.env.ATTACHMENT_MAX_FILE_SIZE_MB
+          process.env.ATTACHMENT_MAX_FILE_SIZE_MB,
+
+        CPMSOFT_BATCH_PREVIEW_SECRET:
+          process.env.CPMSOFT_BATCH_PREVIEW_SECRET
+
       }
     }
   ]

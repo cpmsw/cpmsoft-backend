@@ -31,6 +31,17 @@ module.exports = async function (fastify) {
   );
 
   // ==================================================
+  // SCHEDULER BATCH PREVIEW AND SAVE
+  // ==================================================
+
+  fastify.register(
+    require("./batch.routes"),
+    {
+      prefix: "/schedules"
+    }
+  );
+
+  // ==================================================
   // SCHEDULER HISTORY
   // ==================================================
 
