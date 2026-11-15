@@ -574,6 +574,96 @@ module.exports = async function (fastify) {
 
 
   // ==================================================
+  // UPDATE EXCEPTION
+  // ==================================================
+
+  fastify.put(
+    "/:id/exceptions/:exceptionId",
+    {
+      preHandler: [
+        requirePermission("projects.edit")
+      ],
+      schema: {
+        tags: ["Scheduler Calendars"],
+        summary: "Update calendar exception",
+        params: {
+          type: "object",
+          required: ["id", "exceptionId"],
+          properties: {
+            id: {
+              type: "string",
+              format: "uuid"
+            },
+            exceptionId: {
+              type: "string",
+              format: "uuid"
+            }
+          }
+        },
+        body: {
+          type: "object",
+          required: [
+            "exceptionDate",
+            "isWorking"
+          ],
+          properties: {
+            exceptionDate: {
+              type: "string",
+              format: "date"
+            },
+            exceptionName: {
+              type: ["string", "null"],
+              maxLength: 150
+            },
+            isWorking: {
+              type: "boolean"
+            },
+            periods: {
+              type: "array",
+              items: {
+                type: "object",
+                required: [
+                  "periodNumber",
+                  "startTime",
+                  "endTime"
+                ],
+                properties: {
+                  periodNumber: {
+                    type: "integer",
+                    minimum: 1
+                  },
+                  startTime: {
+                    type: "string"
+                  },
+                  endTime: {
+                    type: "string"
+                  }
+                },
+                additionalProperties: false
+              }
+            }
+          },
+          additionalProperties: false
+        }
+      }
+    },
+    async (request) => {
+      const tenantId = request.user.tenantId;
+      const userId = request.user.userId;
+      const { id, exceptionId } = request.params;
+
+      return service.updateException(
+        tenantId,
+        userId,
+        id,
+        exceptionId,
+        request.body
+      );
+    }
+  );
+
+
+  // ==================================================
   // DELETE EXCEPTION
   // ==================================================
 
