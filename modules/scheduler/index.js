@@ -51,4 +51,9 @@ module.exports = async function (fastify) {
       prefix: "/schedules"
     }
   );
+
+  fastify.register(require("./schedulerCriticalPath.routes"), {
+    prefix: "/schedules"
+  });
+
 };
