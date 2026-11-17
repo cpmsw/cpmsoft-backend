@@ -30,6 +30,10 @@ const batchBodySchema = {
         "relationships"
       ],
       properties: {
+        replaceExisting: {
+          type: "boolean",
+          default: false
+        },
         activities: {
           type: "object",
           required: [
